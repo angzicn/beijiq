@@ -1,0 +1,4 @@
+[
+  { "file": "robot.ldr", "name": "机器人示例 (robot.ldr)" },
+  { "file": "lift.mpd", "name": "抬升结构（打包 mpd）" }
+]
