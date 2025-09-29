@@ -82,8 +82,11 @@
     scene.add(grid);
 
     // LDraw Loader
+    // "https://cdn.jsdelivr.net/gh/ldraw/ldraw@main/parts/"
+    // "https://raw.githubusercontent.com/gkjohnson/ldraw-parts-library/master/complete/ldraw/" 颜色不对的库
     const loader = new LDrawLoader();
-    loader.setPartsLibraryPath("https://raw.githubusercontent.com/gkjohnson/ldraw-parts-library/master/complete/ldraw/");
+    loader.setPartsLibraryPath("https://cdn.jsdelivr.net/gh/ldraw/ldraw@main/parts/");
+    
 
     let currentGroup = null;
     function clearCurrent() {
@@ -204,3 +207,4 @@
   </script>
 </body>
 </html>
+
