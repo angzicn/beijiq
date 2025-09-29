@@ -1,74 +1,195 @@
-<!DOCTYPE html><!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <title>LDraw Viewer</title>
+  <meta charset="utf-8" />
+  <title>LDraw Viewer（下拉选择）</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { margin: 0; overflow: hidden; }
-    #selector { position: absolute; top: 10px; left: 10px; z-index: 1; }
+    html,body { height:100%; margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto; }
+    canvas { display:block; }
+    #ui {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      z-index: 20;
+      background: rgba(255,255,255,0.95);
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      min-width: 260px;
+    }
+    #ui select, #ui button, #ui input { margin:6px 0; width:100%; box-sizing:border-box; }
+    #status { margin-top:6px; font-size:12px; color:#333; }
   </style>
 </head>
 <body>
-  <select id="selector"></select>
+  <div id="ui">
+    <div><strong>托管模型（models 文件夹）</strong></div>
+    <select id="modelSelect"><option>正在加载…</option></select>
+    <button id="loadBtn">加载所选模型</button>
 
-<script type="module">
-  import * as THREE from "https://cdn.skypack.dev/three@0.150.1";
-  import { OrbitControls } from "https://cdn.skypack.dev/three@0.150.1/examples/jsm/controls/OrbitControls.js";
-  import { LDrawLoader } from "https://cdn.skypack.dev/three@0.150.1/examples/jsm/loaders/LDrawLoader.js";
+    <div style="height:8px"></div>
+    <div><strong>本地打开（拖文件）</strong></div>
+    <input id="fileInput" type="file" accept=".ldr,.mpd,.io,.txt" />
+    <button id="fitBtn">视野自适应</button>
+    <button id="fullscreenBtn">切换全屏</button>
 
+    <div id="status">状态：就绪</div>
+  </div>
+
+  <!-- 使用 ES Module 版本的 three.js -->
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js";
+    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/controls/OrbitControls.js";
+    import { LDrawLoader } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/LDrawLoader.js";
+
+    // 基本场景
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xeeeeee);
+    scene.background = new THREE.Color(0xf7f7f7);
 
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({antialias:true});
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 10000);
+    camera.position.set(300, 200, 300);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    renderer.setSize(innerWidth, innerHeight);
     document.body.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    camera.position.set(100, 200, 300);
+    controls.target.set(0,0,0);
     controls.update();
 
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(1, 1, 1);
-    scene.add(light);
+    // 光线
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const dl = new THREE.DirectionalLight(0xffffff, 0.6);
+    dl.position.set(100,200,100);
+    scene.add(dl);
 
-    fetch("models/models.json")
-      .then(res => res.json())
-      .then(models => {
-        const selector = document.getElementById("selector");
-        models.forEach(name => {
-          const option = document.createElement("option");
-          option.value = name;
-          option.textContent = name;
-          selector.appendChild(option);
-        });
-        if (models.length > 0) loadModel(models[0]);
-        selector.addEventListener("change", e => loadModel(e.target.value));
-      });
+    // 地面网格
+    const grid = new THREE.GridHelper(400, 40, 0xcccccc, 0xeeeeee);
+    grid.position.y = 0;
+    scene.add(grid);
 
-    let currentModel = null;
+    // LDraw Loader
     const loader = new LDrawLoader();
+    loader.setPartsLibraryPath("https://raw.githubusercontent.com/gkjohnson/ldraw-parts-library/master/complete/ldraw/");
 
-    function loadModel(file) {
-      if (currentModel) {
-        scene.remove(currentModel);
-        currentModel = null;
-      }
-      loader.load("models/" + file, group => {
-        currentModel = group;
+    let currentGroup = null;
+    function clearCurrent() {
+      if (!currentGroup) return;
+      scene.remove(currentGroup);
+      currentGroup.traverse(node => {
+        if (node.geometry) node.geometry.dispose();
+        if (node.material) {
+          if (Array.isArray(node.material)) node.material.forEach(m=>m.dispose && m.dispose());
+          else node.material.dispose && node.material.dispose();
+        }
+      });
+      currentGroup = null;
+    }
+
+    const statusEl = document.getElementById("status");
+    function setStatus(t){ statusEl.innerText = "状态：" + t; }
+
+    function loadModelByUrl(url) {
+      setStatus("加载：" + url);
+      clearCurrent();
+      loader.load(url, group => {
+        currentGroup = group;
         scene.add(group);
+        fitCameraToObject(group);
+        setStatus("加载完成：" + url);
+      }, undefined, err => {
+        console.error(err);
+        setStatus("加载失败");
       });
     }
 
-    function animate() {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
+    function loadFromText(text, name="(local)") {
+      setStatus("解析本地：" + name);
+      clearCurrent();
+      try {
+        const group = loader.parse(text);
+        currentGroup = group;
+        scene.add(group);
+        fitCameraToObject(group);
+        setStatus("本地解析完成：" + name);
+      } catch (e) {
+        console.error(e);
+        setStatus("本地解析失败");
+      }
     }
+
+    function fitCameraToObject(obj) {
+      const box = new THREE.Box3().setFromObject(obj);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const fov = camera.fov * (Math.PI / 180);
+      let cameraZ = Math.abs(maxDim / 2 * 1.8 / Math.tan(fov / 2));
+      if (!isFinite(cameraZ) || cameraZ <= 0) cameraZ = 300;
+      camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
+      camera.lookAt(center);
+      controls.target.copy(center);
+      controls.update();
+    }
+
+    function animate(){ requestAnimationFrame(animate); renderer.render(scene, camera); }
     animate();
+
+    window.addEventListener("resize", ()=>{
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    document.getElementById("loadBtn").addEventListener("click", ()=>{
+      const sel = document.getElementById("modelSelect");
+      if (!sel.value) return;
+      loadModelByUrl("models/" + sel.value);
+    });
+
+    document.getElementById("fileInput").addEventListener("change", e=>{
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = ()=> loadFromText(reader.result, f.name);
+      reader.readAsText(f);
+    });
+
+    document.getElementById("fitBtn").addEventListener("click", ()=>{
+      if (currentGroup) fitCameraToObject(currentGroup);
+    });
+
+    document.getElementById("fullscreenBtn").addEventListener("click", async ()=>{
+      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+      else await document.exitFullscreen();
+    });
+
+    async function populateModels() {
+      const sel = document.getElementById("modelSelect");
+      sel.innerHTML = "<option>正在加载…</option>";
+      try {
+        const res = await fetch("models/models.json", {cache: "no-store"});
+        const arr = await res.json();
+        sel.innerHTML = "<option value=''>-- 请选择托管模型 --</option>";
+        arr.forEach(fn=>{
+          const opt = document.createElement("option");
+          opt.value = fn;
+          opt.textContent = fn;
+          sel.appendChild(opt);
+        });
+        if (arr.length > 0) {
+          sel.selectedIndex = 1;
+          loadModelByUrl("models/" + arr[0]);
+        }
+      } catch (err) {
+        console.error(err);
+        sel.innerHTML = "<option>加载失败</option>";
+        setStatus("无法加载 models.json");
+      }
+    }
+    populateModels();
   </script>
 </body>
 </html>
-
-
-
