@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <title>LDraw Viewer（下拉选择）</title>
+  <title>LDraw 模型查看器</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
   <script type="importmap">
@@ -29,34 +29,45 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.12);
       min-width: 260px;
     }
-    #ui select, #ui button, #ui input { margin:6px 0; width:100%; box-sizing:border-box; }
+    #ui select, #ui button { margin:6px 0; width:100%; box-sizing:border-box; }
     #status { margin-top:6px; font-size:12px; color:#333; }
+    .section-title { 
+      font-weight: bold; 
+      margin-bottom: 8px;
+      color: #333;
+    }
+    .button-group {
+      display: flex;
+      gap: 5px;
+      margin-top: 8px;
+    }
+    .button-group button {
+      flex: 1;
+    }
   </style>
 </head>
 <body>
   <div id="ui">
-    <div><strong>托管模型（models 文件夹）</strong></div>
+    <div class="section-title">选择模型</div>
     <select id="modelSelect"><option>正在加载…</option></select>
-    <button id="loadBtn">加载所选模型</button>
-
-    <div style="height:8px"></div>
-    <div><strong>本地打开（拖文件）</strong></div>
-    <input id="fileInput" type="file" accept=".ldr,.mpd,.io,.txt" />
-    <button id="fitBtn">视野自适应</button>
-    <button id="fullscreenBtn">切换全屏</button>
-
+    <button id="loadBtn">加载模型</button>
+    
+    <div class="button-group">
+      <button id="fitBtn">视野自适应</button>
+      <button id="fullscreenBtn">全屏</button>
+    </div>
+    
     <div id="status">状态：就绪</div>
   </div>
 
   <script type="module">
-    // 使用import map中的路径，不要用直接URL
     import * as THREE from "three";
     import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
     import { LDrawLoader } from "three/examples/jsm/loaders/LDrawLoader";
 
-    // 基本场景
+    // 基本场景 - 使用浅浅的灰色背景
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf7f7f7);
+    scene.background = new THREE.Color(0xe8e8e8); // 浅浅的灰色
 
     const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 10000);
     camera.position.set(300, 200, 300);
@@ -65,7 +76,7 @@
     renderer.setPixelRatio(window.devicePixelRatio || 1);
     renderer.setSize(innerWidth, innerHeight);
     
-    // 重要：添加色彩空间设置
+    // 设置色彩空间以改善颜色显示
     if (renderer.outputColorSpace !== undefined) {
       renderer.outputColorSpace = THREE.SRGBColorSpace;
     } else if (renderer.outputEncoding !== undefined) {
@@ -78,26 +89,20 @@
     controls.target.set(0,0,0);
     controls.update();
 
-    // 光线
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const dl = new THREE.DirectionalLight(0xffffff, 0.6);
-    dl.position.set(100,200,100);
-    scene.add(dl);
+    // 光线 - 增强光照效果
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const dl1 = new THREE.DirectionalLight(0xffffff, 0.8);
+    dl1.position.set(100, 200, 100);
+    scene.add(dl1);
+    
+    const dl2 = new THREE.DirectionalLight(0xffffff, 0.4);
+    dl2.position.set(-100, -100, -100);
+    scene.add(dl2);
 
-    // 地面网格
-    const grid = new THREE.GridHelper(400, 40, 0xcccccc, 0xeeeeee);
-    grid.position.y = 0;
-    scene.add(grid);
+    // 注意：移除了地面网格
 
-    // LDraw Loader - 关键修改
+    // LDraw Loader - 使用打包后的MPD文件，不需要零件库路径
     const loader = new LDrawLoader();
-    
-    // 对于打包的MPD文件，强制设置空的零件库路径
-    // 这样可以防止加载器去外部查找零件
-    loader.setPartsLibraryPath("");
-    
-    // 或者尝试设置为null
-    // loader.setPartsLibraryPath(null);
 
     let currentGroup = null;
     function clearCurrent() {
@@ -117,16 +122,14 @@
     function setStatus(t){ statusEl.innerText = "状态：" + t; }
 
     function loadModelByUrl(url) {
-      setStatus("加载：" + url);
+      setStatus("加载中...");
       clearCurrent();
-      
-      // 添加详细的加载进度和错误处理
       loader.load(url, 
         group => {
           currentGroup = group;
           scene.add(group);
           
-          // 添加材质强制更新
+          // 材质更新确保颜色正确显示
           group.traverse((child) => {
             if (child.isMesh && child.material) {
               child.material.needsUpdate = true;
@@ -134,29 +137,14 @@
           });
           
           fitCameraToObject(group);
-          setStatus("加载完成：" + url);
+          setStatus("加载完成");
         }, 
         undefined, 
         err => {
-          console.error("加载错误详情:", err);
-          setStatus("加载失败: " + (err.message || "未知错误"));
+          console.error("加载错误:", err);
+          setStatus("加载失败");
         }
       );
-    }
-
-    function loadFromText(text, name="(local)") {
-      setStatus("解析本地：" + name);
-      clearCurrent();
-      try {
-        const group = loader.parse(text);
-        currentGroup = group;
-        scene.add(group);
-        fitCameraToObject(group);
-        setStatus("本地解析完成：" + name);
-      } catch (e) {
-        console.error(e);
-        setStatus("本地解析失败");
-      }
     }
 
     function fitCameraToObject(obj) {
@@ -191,47 +179,42 @@
       loadModelByUrl("models/" + sel.value);
     });
 
-    document.getElementById("fileInput").addEventListener("change", e=>{
-      const f = e.target.files && e.target.files[0];
-      if (!f) return;
-      const reader = new FileReader();
-      reader.onload = ()=> loadFromText(reader.result, f.name);
-      reader.readAsText(f);
-    });
-
     document.getElementById("fitBtn").addEventListener("click", ()=>{
       if (currentGroup) fitCameraToObject(currentGroup);
     });
 
     document.getElementById("fullscreenBtn").addEventListener("click", async ()=>{
-      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
-      else await document.exitFullscreen();
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
     });
 
     async function populateModels() {
       const sel = document.getElementById("modelSelect");
-      sel.innerHTML = "<option>正在加载…</option>";
+      sel.innerHTML = "<option>正在加载模型列表...</option>";
       try {
         const res = await fetch("models/models.json", {cache: "no-store"});
         const arr = await res.json();
-        sel.innerHTML = "<option value=''>-- 请选择托管模型 --</option>";
+        sel.innerHTML = "<option value=''>-- 请选择模型 --</option>";
         arr.forEach(fn=>{
           const opt = document.createElement("option");
           opt.value = fn;
-          opt.textContent = fn;
+          opt.textContent = fn.replace('.mpd', '').replace(/_/g, ' '); // 美化显示名称
           sel.appendChild(opt);
         });
         if (arr.length > 0) {
           sel.selectedIndex = 1;
-          // 给加载器一点初始化时间
+          // 自动加载第一个模型
           setTimeout(() => {
             loadModelByUrl("models/" + arr[0]);
           }, 100);
         }
       } catch (err) {
         console.error(err);
-        sel.innerHTML = "<option>加载失败</option>";
-        setStatus("无法加载 models.json");
+        sel.innerHTML = "<option>加载模型列表失败</option>";
+        setStatus("无法加载模型列表");
       }
     }
     
@@ -242,4 +225,3 @@
   </script>
 </body>
 </html>
-
