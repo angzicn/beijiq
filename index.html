@@ -4,6 +4,17 @@
   <meta charset="utf-8" />
   <title>LDraw Viewer（下拉选择）</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js",
+        "three/examples/jsm/controls/OrbitControls": "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/controls/OrbitControls.js",
+        "three/examples/jsm/loaders/LDrawLoader": "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/LDrawLoader.js"
+      }
+    }
+  </script>
+  
   <style>
     html,body { height:100%; margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto; }
     canvas { display:block; }
@@ -193,3 +204,4 @@
   </script>
 </body>
 </html>
+
