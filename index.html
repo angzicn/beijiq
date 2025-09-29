@@ -4,7 +4,8 @@
   <meta charset="utf-8" />
   <title>LDraw Viewer（下拉选择）</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-
+  
+  <!-- 添加import maps解决模块解析 -->
   <script type="importmap">
     {
       "imports": {
@@ -14,6 +15,9 @@
       }
     }
   </script>
+  
+  <!-- 添加favicon避免404 -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧱</text></svg>">
   
   <style>
     html,body { height:100%; margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto; }
@@ -48,190 +52,168 @@
     <div id="status">状态：就绪</div>
   </div>
 
-  <!-- 使用 ES Module 版本的 three.js -->
-<script type="module">
-  import * as THREE from "three";
-  import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-  import { LDrawLoader } from "three/examples/jsm/loaders/LDrawLoader";
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+    import { LDrawLoader } from "three/examples/jsm/loaders/LDrawLoader";
 
-  // 基本场景（保持不变）
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf7f7f7);
+    // 基本场景
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf7f7f7);
 
-  const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 10000);
-  camera.position.set(300, 200, 300);
+    const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 10000);
+    camera.position.set(300, 200, 300);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(window.devicePixelRatio || 1);
-  renderer.setSize(innerWidth, innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0,0,0);
-  controls.update();
-
-  // 光线
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const dl = new THREE.DirectionalLight(0xffffff, 0.6);
-  dl.position.set(100,200,100);
-  scene.add(dl);
-
-  // 地面网格
-  const grid = new THREE.GridHelper(400, 40, 0xcccccc, 0xeeeeee);
-  grid.position.y = 0;
-  scene.add(grid);
-
-  // LDraw Loader - 修改这部分
-  const loader = new LDrawLoader();
-  
-  // 使用更可靠的零件库路径
-  loader.setPartsLibraryPath("https://cdn.jsdelivr.net/npm/ldraw-parts-library@1.0.1/");
-  
-  // 设置材质路径
-  loader.setMaterialsLibraryPath("https://cdn.jsdelivivr.net/npm/ldraw-parts-library@1.0.1/");
-
-  let currentGroup = null;
-  function clearCurrent() {
-    if (!currentGroup) return;
-    scene.remove(currentGroup);
-    currentGroup.traverse(node => {
-      if (node.geometry) node.geometry.dispose();
-      if (node.material) {
-        if (Array.isArray(node.material)) node.material.forEach(m=>m.dispose && m.dispose());
-        else node.material.dispose && node.material.dispose();
-      }
-    });
-    currentGroup = null;
-  }
-
-  const statusEl = document.getElementById("status");
-  function setStatus(t){ statusEl.innerText = "状态：" + t; }
-
-  // 修改loadModelByUrl函数，添加错误处理
-  function loadModelByUrl(url) {
-    setStatus("加载：" + url);
-    clearCurrent();
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    renderer.setSize(innerWidth, innerHeight);
     
-    // 预加载确保零件库就绪
-    loader.preload().then(() => {
+    // 设置色彩空间以改善颜色显示
+    if (renderer.outputColorSpace !== undefined) {
+      renderer.outputColorSpace = THREE.SRGBColorSpace; // Three.js r152+
+    } else if (renderer.outputEncoding !== undefined) {
+      renderer.outputEncoding = THREE.sRGBEncoding; // Three.js r125-r151
+    }
+    
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0,0,0);
+    controls.update();
+
+    // 光线
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const dl = new THREE.DirectionalLight(0xffffff, 0.6);
+    dl.position.set(100,200,100);
+    scene.add(dl);
+
+    // 地面网格
+    const grid = new THREE.GridHelper(400, 40, 0xcccccc, 0xeeeeee);
+    grid.position.y = 0;
+    scene.add(grid);
+
+    // LDraw Loader
+    const loader = new LDrawLoader();
+    
+    // 使用官方LDraw零件库
+    loader.setPartsLibraryPath("https://cdn.jsdelivr.net/npm/ldraw-parts-library@1.0.1/");
+
+    let currentGroup = null;
+    function clearCurrent() {
+      if (!currentGroup) return;
+      scene.remove(currentGroup);
+      currentGroup.traverse(node => {
+        if (node.geometry) node.geometry.dispose();
+        if (node.material) {
+          if (Array.isArray(node.material)) node.material.forEach(m=>m.dispose && m.dispose());
+          else node.material.dispose && node.material.dispose();
+        }
+      });
+      currentGroup = null;
+    }
+
+    const statusEl = document.getElementById("status");
+    function setStatus(t){ statusEl.innerText = "状态：" + t; }
+
+    function loadModelByUrl(url) {
+      setStatus("加载：" + url);
+      clearCurrent();
       loader.load(url, group => {
         currentGroup = group;
         scene.add(group);
         fitCameraToObject(group);
         setStatus("加载完成：" + url);
-        
-        // 强制更新材质
-        group.traverse((child) => {
-          if (child.isMesh) {
-            child.material.needsUpdate = true;
-          }
-        });
       }, undefined, err => {
-        console.error("加载错误:", err);
-        setStatus("加载失败: " + err.message);
+        console.error(err);
+        setStatus("加载失败");
       });
-    }).catch(err => {
-      console.error("预加载错误:", err);
-      setStatus("预加载失败");
-    });
-  }
-
-  // 其余函数保持不变...
-  function loadFromText(text, name="(local)") {
-    setStatus("解析本地：" + name);
-    clearCurrent();
-    try {
-      const group = loader.parse(text);
-      currentGroup = group;
-      scene.add(group);
-      fitCameraToObject(group);
-      setStatus("本地解析完成：" + name);
-    } catch (e) {
-      console.error(e);
-      setStatus("本地解析失败");
     }
-  }
 
-  function fitCameraToObject(obj) {
-    const box = new THREE.Box3().setFromObject(obj);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const fov = camera.fov * (Math.PI / 180);
-    let cameraZ = Math.abs(maxDim / 2 * 1.8 / Math.tan(fov / 2));
-    if (!isFinite(cameraZ) || cameraZ <= 0) cameraZ = 300;
-    camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
-    camera.lookAt(center);
-    controls.target.copy(center);
-    controls.update();
-  }
-
-  function animate(){ requestAnimationFrame(animate); renderer.render(scene, camera); }
-  animate();
-
-  window.addEventListener("resize", ()=>{
-    camera.aspect = innerWidth / innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(innerWidth, innerHeight);
-  });
-
-  // UI事件处理（保持不变）
-  document.getElementById("loadBtn").addEventListener("click", ()=>{
-    const sel = document.getElementById("modelSelect");
-    if (!sel.value) return;
-    loadModelByUrl("models/" + sel.value);
-  });
-
-  document.getElementById("fileInput").addEventListener("change", e=>{
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = ()=> loadFromText(reader.result, f.name);
-    reader.readAsText(f);
-  });
-
-  document.getElementById("fitBtn").addEventListener("click", ()=>{
-    if (currentGroup) fitCameraToObject(currentGroup);
-  });
-
-  document.getElementById("fullscreenBtn").addEventListener("click", async ()=>{
-    if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
-    else await document.exitFullscreen();
-  });
-
-  async function populateModels() {
-    const sel = document.getElementById("modelSelect");
-    sel.innerHTML = "<option>正在加载…</option>";
-    try {
-      const res = await fetch("models/models.json", {cache: "no-store"});
-      const arr = await res.json();
-      sel.innerHTML = "<option value=''>-- 请选择托管模型 --</option>";
-      arr.forEach(fn=>{
-        const opt = document.createElement("option");
-        opt.value = fn;
-        opt.textContent = fn;
-        sel.appendChild(opt);
-      });
-      if (arr.length > 0) {
-        sel.selectedIndex = 1;
-        // 延迟加载，确保LDrawLoader已初始化
-        setTimeout(() => {
-          loadModelByUrl("models/" + arr[0]);
-        }, 500);
+    function loadFromText(text, name="(local)") {
+      setStatus("解析本地：" + name);
+      clearCurrent();
+      try {
+        const group = loader.parse(text);
+        currentGroup = group;
+        scene.add(group);
+        fitCameraToObject(group);
+        setStatus("本地解析完成：" + name);
+      } catch (e) {
+        console.error(e);
+        setStatus("本地解析失败");
       }
-    } catch (err) {
-      console.error(err);
-      sel.innerHTML = "<option>加载失败</option>";
-      setStatus("无法加载 models.json");
     }
-  }
-  
-  // 延迟初始化，确保所有资源加载完成
-  setTimeout(() => {
+
+    function fitCameraToObject(obj) {
+      const box = new THREE.Box3().setFromObject(obj);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const fov = camera.fov * (Math.PI / 180);
+      let cameraZ = Math.abs(maxDim / 2 * 1.8 / Math.tan(fov / 2));
+      if (!isFinite(cameraZ) || cameraZ <= 0) cameraZ = 300;
+      camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
+      camera.lookAt(center);
+      controls.target.copy(center);
+      controls.update();
+    }
+
+    function animate(){ requestAnimationFrame(animate); renderer.render(scene, camera); }
+    animate();
+
+    window.addEventListener("resize", ()=>{
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    document.getElementById("loadBtn").addEventListener("click", ()=>{
+      const sel = document.getElementById("modelSelect");
+      if (!sel.value) return;
+      loadModelByUrl("models/" + sel.value);
+    });
+
+    document.getElementById("fileInput").addEventListener("change", e=>{
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = ()=> loadFromText(reader.result, f.name);
+      reader.readAsText(f);
+    });
+
+    document.getElementById("fitBtn").addEventListener("click", ()=>{
+      if (currentGroup) fitCameraToObject(currentGroup);
+    });
+
+    document.getElementById("fullscreenBtn").addEventListener("click", async ()=>{
+      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+      else await document.exitFullscreen();
+    });
+
+    async function populateModels() {
+      const sel = document.getElementById("modelSelect");
+      sel.innerHTML = "<option>正在加载…</option>";
+      try {
+        const res = await fetch("models/models.json", {cache: "no-store"});
+        const arr = await res.json();
+        sel.innerHTML = "<option value=''>-- 请选择托管模型 --</option>";
+        arr.forEach(fn=>{
+          const opt = document.createElement("option");
+          opt.value = fn;
+          opt.textContent = fn;
+          sel.appendChild(opt);
+        });
+        if (arr.length > 0) {
+          sel.selectedIndex = 1;
+          loadModelByUrl("models/" + arr[0]);
+        }
+      } catch (err) {
+        console.error(err);
+        sel.innerHTML = "<option>加载失败</option>";
+        setStatus("无法加载 models.json");
+      }
+    }
     populateModels();
-  }, 1000);
-</script>
+  </script>
 </body>
 </html>
-
-
