@@ -69,8 +69,8 @@
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xe8e8e8); // 浅浅的灰色
 
-    const camera = new THREE.PerspectiveCamera(30, innerWidth/innerHeight, 0.1, 10000); //fov 45
-    camera.position.set(300, 200, 300);
+    const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 10000); //fov 45
+    camera.position.set(300, 200, 150);  //z 300
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio || 1);
@@ -225,4 +225,5 @@
   </script>
 </body>
 </html>
+
 
