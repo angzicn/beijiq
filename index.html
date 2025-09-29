@@ -11,10 +11,10 @@
 <body>
   <select id="selector"></select>
 
-  <script type="module">
-    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js";
-    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/controls/OrbitControls.js";
-    import { LDrawLoader } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/LDrawLoader.js";
+<script type="module">
+  import * as THREE from "https://cdn.skypack.dev/three@0.150.1";
+  import { OrbitControls } from "https://cdn.skypack.dev/three@0.150.1/examples/jsm/controls/OrbitControls.js";
+  import { LDrawLoader } from "https://cdn.skypack.dev/three@0.150.1/examples/jsm/loaders/LDrawLoader.js";
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xeeeeee);
@@ -69,5 +69,6 @@
   </script>
 </body>
 </html>
+
 
 
