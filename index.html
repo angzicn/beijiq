@@ -1,76 +1,43 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>LDraw Viewer</title>
   <style>
-    body { margin: 0; font-family: sans-serif; }
+    body { margin: 0; overflow: hidden; }
     canvas { display: block; }
-    #menu {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: white;
-      padding: 5px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
   </style>
 </head>
 <body>
-  <div id="menu">
-    <label for="modelSelect">选择模型：</label>
-    <select id="modelSelect"><option>正在加载...</option></select>
-  </div>
+  <div id="loading">正在加载模型...</div>
 
+  <!-- three.js 和 LDrawLoader 从 CDN 引入 -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/LDrawLoader.js"></script>
 
+  <!-- 你自己的脚本 -->
   <script>
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xffffff);
-
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(100, 100, 100);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
+    // 灯光
     const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(50, 100, 50).normalize();
+    light.position.set(10, 10, 10).normalize();
     scene.add(light);
 
+    // 加载 LDraw 模型
     const loader = new THREE.LDrawLoader();
-    let currentModel = null;
+    loader.setPath('models/'); // 指定文件夹
+    loader.load('robot.ldr', (result) => {
+      const model = result;
+      scene.add(model);
+      document.getElementById('loading').style.display = 'none'; // 隐藏加载提示
+    });
 
-    function loadModel(filename) {
-      if (currentModel) scene.remove(currentModel);
-      loader.load('models/' + filename, group => {
-        currentModel = group;
-        scene.add(group);
-      });
-    }
-
-    // 动态加载模型列表
-    fetch('models/models.json')
-      .then(res => res.json())
-      .then(models => {
-        const select = document.getElementById("modelSelect");
-        select.innerHTML = "";
-        models.forEach(model => {
-          const option = document.createElement("option");
-          option.value = model;
-          option.textContent = model;
-          select.appendChild(option);
-        });
-        loadModel(models[0]); // 默认加载第一个
-        select.addEventListener("change", () => loadModel(select.value));
-      })
-      .catch(err => {
-        console.error("加载模型列表失败:", err);
-        document.getElementById("modelSelect").innerHTML = "<option>加载失败</option>";
-      });
+    camera.position.set(0, 200, 400);
 
     function animate() {
       requestAnimationFrame(animate);
@@ -86,3 +53,5 @@
   </script>
 </body>
 </html>
+
+
