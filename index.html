@@ -48,11 +48,11 @@
     <div id="status">状态：就绪</div>
   </div>
 
-  <!-- 使用 ES Module 版本的 three.js -->
   <script type="module">
-    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js";
-    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/controls/OrbitControls.js";
-    import { LDrawLoader } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/LDrawLoader.js";
+    // 使用import map中的路径，不要用直接URL
+    import * as THREE from "three";
+    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+    import { LDrawLoader } from "three/examples/jsm/loaders/LDrawLoader";
 
     // 基本场景
     const scene = new THREE.Scene();
@@ -64,6 +64,14 @@
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio || 1);
     renderer.setSize(innerWidth, innerHeight);
+    
+    // 重要：添加色彩空间设置
+    if (renderer.outputColorSpace !== undefined) {
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+    } else if (renderer.outputEncoding !== undefined) {
+      renderer.outputEncoding = THREE.sRGBEncoding;
+    }
+    
     document.body.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -81,13 +89,15 @@
     grid.position.y = 0;
     scene.add(grid);
 
-    // LDraw Loader
-    // "https://cdn.jsdelivr.net/gh/ldraw/ldraw@main/parts/" 这个库用不了
-    // "https://raw.githubusercontent.com/gkjohnson/ldraw-parts-library/master/complete/ldraw/" 颜色不对的库
-    // "https://raw.githubusercontent.com/ldraw/ldraw/main/parts/"
+    // LDraw Loader - 关键修改
     const loader = new LDrawLoader();
-    //loader.setPartsLibraryPath("https://raw.githubusercontent.com/ldraw/ldraw/main/parts/");
     
+    // 对于打包的MPD文件，强制设置空的零件库路径
+    // 这样可以防止加载器去外部查找零件
+    loader.setPartsLibraryPath("");
+    
+    // 或者尝试设置为null
+    // loader.setPartsLibraryPath(null);
 
     let currentGroup = null;
     function clearCurrent() {
@@ -109,15 +119,29 @@
     function loadModelByUrl(url) {
       setStatus("加载：" + url);
       clearCurrent();
-      loader.load(url, group => {
-        currentGroup = group;
-        scene.add(group);
-        fitCameraToObject(group);
-        setStatus("加载完成：" + url);
-      }, undefined, err => {
-        console.error(err);
-        setStatus("加载失败");
-      });
+      
+      // 添加详细的加载进度和错误处理
+      loader.load(url, 
+        group => {
+          currentGroup = group;
+          scene.add(group);
+          
+          // 添加材质强制更新
+          group.traverse((child) => {
+            if (child.isMesh && child.material) {
+              child.material.needsUpdate = true;
+            }
+          });
+          
+          fitCameraToObject(group);
+          setStatus("加载完成：" + url);
+        }, 
+        undefined, 
+        err => {
+          console.error("加载错误详情:", err);
+          setStatus("加载失败: " + (err.message || "未知错误"));
+        }
+      );
     }
 
     function loadFromText(text, name="(local)") {
@@ -149,7 +173,10 @@
       controls.update();
     }
 
-    function animate(){ requestAnimationFrame(animate); renderer.render(scene, camera); }
+    function animate(){ 
+      requestAnimationFrame(animate); 
+      renderer.render(scene, camera); 
+    }
     animate();
 
     window.addEventListener("resize", ()=>{
@@ -196,7 +223,10 @@
         });
         if (arr.length > 0) {
           sel.selectedIndex = 1;
-          loadModelByUrl("models/" + arr[0]);
+          // 给加载器一点初始化时间
+          setTimeout(() => {
+            loadModelByUrl("models/" + arr[0]);
+          }, 100);
         }
       } catch (err) {
         console.error(err);
@@ -204,10 +234,12 @@
         setStatus("无法加载 models.json");
       }
     }
-    populateModels();
+    
+    // 页面加载完成后初始化
+    setTimeout(() => {
+      populateModels();
+    }, 500);
   </script>
 </body>
 </html>
-
-
 
