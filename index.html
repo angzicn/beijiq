@@ -16,24 +16,22 @@
     import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/controls/OrbitControls.js";
     import { LDrawLoader } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/LDrawLoader.js";
 
-    // 场景
     const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xeeeeee);
+
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({antialias:true});
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // 控制器
     const controls = new OrbitControls(camera, renderer.domElement);
     camera.position.set(100, 200, 300);
     controls.update();
 
-    // 光源
     const light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(1, 1, 1);
     scene.add(light);
 
-    // 读取模型列表
     fetch("models/models.json")
       .then(res => res.json())
       .then(models => {
@@ -63,7 +61,6 @@
       });
     }
 
-    // 渲染循环
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
@@ -73,3 +70,4 @@
   </script>
 </body>
 </html>
+
