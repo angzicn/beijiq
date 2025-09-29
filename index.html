@@ -4,8 +4,7 @@
   <meta charset="utf-8" />
   <title>LDraw Viewer（下拉选择）</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  
-  <!-- 添加import maps解决模块解析 -->
+
   <script type="importmap">
     {
       "imports": {
@@ -15,9 +14,6 @@
       }
     }
   </script>
-  
-  <!-- 添加favicon避免404 -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧱</text></svg>">
   
   <style>
     html,body { height:100%; margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto; }
@@ -52,10 +48,11 @@
     <div id="status">状态：就绪</div>
   </div>
 
+  <!-- 使用 ES Module 版本的 three.js -->
   <script type="module">
-    import * as THREE from "three";
-    import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-    import { LDrawLoader } from "three/examples/jsm/loaders/LDrawLoader";
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js";
+    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/controls/OrbitControls.js";
+    import { LDrawLoader } from "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/LDrawLoader.js";
 
     // 基本场景
     const scene = new THREE.Scene();
@@ -67,14 +64,6 @@
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio || 1);
     renderer.setSize(innerWidth, innerHeight);
-    
-    // 设置色彩空间以改善颜色显示
-    if (renderer.outputColorSpace !== undefined) {
-      renderer.outputColorSpace = THREE.SRGBColorSpace; // Three.js r152+
-    } else if (renderer.outputEncoding !== undefined) {
-      renderer.outputEncoding = THREE.sRGBEncoding; // Three.js r125-r151
-    }
-    
     document.body.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -94,9 +83,7 @@
 
     // LDraw Loader
     const loader = new LDrawLoader();
-    
-    // 使用官方LDraw零件库
-    loader.setPartsLibraryPath("https://cdn.jsdelivr.net/gh/ldraw/ldraw@main/parts/");
+    loader.setPartsLibraryPath("https://raw.githubusercontent.com/gkjohnson/ldraw-parts-library/master/complete/ldraw/");
 
     let currentGroup = null;
     function clearCurrent() {
@@ -217,6 +204,3 @@
   </script>
 </body>
 </html>
-
-
-
