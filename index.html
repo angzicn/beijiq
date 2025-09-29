@@ -1,55 +1,224 @@
-<!DOCTYPE html><!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <title>LDraw Viewer</title>
+  <meta charset="utf-8" />
+  <title>LDraw Viewer（下拉选择）</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
+    html,body { height:100%; margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto; }
+    canvas { display:block; }
+    #ui {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      z-index: 20;
+      background: rgba(255,255,255,0.95);
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      min-width: 260px;
+    }
+    #ui select, #ui button, #ui input { margin:6px 0; width:100%; box-sizing:border-box; }
+    #status { margin-top:6px; font-size:12px; color:#333; }
   </style>
 </head>
 <body>
-  <div id="loading">正在加载模型...</div>
+  <div id="ui">
+    <div><strong>托管模型（models 文件夹）</strong></div>
+    <select id="modelSelect"><option>正在加载…</option></select>
+    <button id="loadBtn">加载所选模型</button>
 
-  <!-- three.js 和 LDrawLoader 从 CDN 引入 -->
+    <div style="height:8px"></div>
+    <div><strong>本地打开（课堂演示拖文件）</strong></div>
+    <input id="fileInput" type="file" accept=".ldr,.mpd,.io,.txt" />
+    <button id="fitBtn">视野自适应</button>
+    <button id="fullscreenBtn">切换全屏</button>
+
+    <div id="status">状态：就绪</div>
+  </div>
+
+  <!-- 从 CDN 引入 three.js 与 LDrawLoader（推荐，最简单） -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/LDrawLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
 
-  <!-- 你自己的脚本 -->
   <script>
+    // 基本场景/渲染/相机/控制
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({antialias: true});
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    scene.background = new THREE.Color(0xf7f7f7);
+
+    const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 10000);
+    camera.position.set(300, 200, 300);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio || 1);
+    renderer.setSize(innerWidth, innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // 灯光
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(10, 10, 10).normalize();
-    scene.add(light);
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.set(0,0,0);
+    controls.update();
 
-    // 加载 LDraw 模型
+    // 光线与地面网格
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const dl = new THREE.DirectionalLight(0xffffff, 0.6);
+    dl.position.set(100,200,100);
+    scene.add(dl);
+    const grid = new THREE.GridHelper(400, 40, 0xcccccc, 0xeeeeee);
+    grid.position.y = 0;
+    scene.add(grid);
+
+    // LDrawLoader（非 module 版本，已被 three.min.js 引入全局 THREE）
     const loader = new THREE.LDrawLoader();
-    loader.setPath('models/'); // 指定文件夹
-    loader.load('robot.ldr', (result) => {
-      const model = result;
-      scene.add(model);
-      document.getElementById('loading').style.display = 'none'; // 隐藏加载提示
-    });
 
-    camera.position.set(0, 200, 400);
-
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
+    // 指向在线零件库（gkjohnson 的公开库，避免大面积 FC）
+    if (loader.setPartsLibraryPath) {
+      loader.setPartsLibraryPath('https://raw.githubusercontent.com/gkjohnson/ldraw-parts-library/master/complete/ldraw/');
     }
+    // preloadMaterials 不是必须，但若存在可提升颜色匹配
+    if (loader.preloadMaterials) {
+      loader.preloadMaterials('https://raw.githubusercontent.com/gkjohnson/ldraw-parts-library/master/colors/ldcfgalt.ldr').catch(()=>{});
+    }
+
+    let currentGroup = null;
+    function clearCurrent() {
+      if (!currentGroup) return;
+      scene.remove(currentGroup);
+      currentGroup.traverse(node => {
+        if (node.geometry) node.geometry.dispose();
+        if (node.material) {
+          if (Array.isArray(node.material)) node.material.forEach(m=>m.dispose && m.dispose());
+          else node.material.dispose && node.material.dispose();
+        }
+      });
+      currentGroup = null;
+    }
+
+    // 状态显示
+    const statusEl = document.getElementById('status');
+    function setStatus(text){ statusEl.innerText = '状态：' + text; }
+
+    // 加载 models/ 下的文件（相对路径）
+    function loadModelByUrl(url) {
+      setStatus('加载：' + url);
+      clearCurrent();
+      loader.load(url, group => {
+        currentGroup = group;
+        scene.add(group);
+        fitCameraToObject(group);
+        setStatus('加载完成：' + url);
+      }, xhr=>{
+        if (xhr && xhr.loaded && xhr.total) setStatus('加载中：' + Math.round(xhr.loaded/xhr.total*100) + '%');
+      }, err=>{
+        console.error(err);
+        setStatus('加载失败（查看控制台）');
+        alert('加载失败：请打开浏览器控制台查看错误信息（F12 → Console / Network）');
+      });
+    }
+
+    // 从文本解析（用于本地上传）
+    function loadFromText(text, name='(local)') {
+      setStatus('解析本地：' + name);
+      clearCurrent();
+      try {
+        const group = loader.parse(text);
+        currentGroup = group;
+        scene.add(group);
+        fitCameraToObject(group);
+        setStatus('本地解析完成：' + name);
+      } catch (e) {
+        console.error(e);
+        setStatus('本地解析失败（详见控制台）');
+        alert('解析失败：可能是文件格式不兼容或用到了非 LDraw 标准零件，详见控制台');
+      }
+    }
+
+    // 摄像机自适应目标物体
+    function fitCameraToObject(obj) {
+      const box = new THREE.Box3().setFromObject(obj);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const fov = camera.fov * (Math.PI / 180);
+      let cameraZ = Math.abs(maxDim / 2 * 1.8 / Math.tan(fov / 2));
+      if (!isFinite(cameraZ) || cameraZ <= 0) cameraZ = 300;
+      camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
+      camera.lookAt(center);
+      controls.target.copy(center);
+      controls.update();
+    }
+
+    // 动画循环
+    function animate(){ requestAnimationFrame(animate); renderer.render(scene, camera); }
     animate();
 
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
+    // 窗口自适应
+    window.addEventListener('resize', ()=>{
+      camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(innerWidth, innerHeight);
     });
+
+    // UI 事件
+    document.getElementById('loadBtn').addEventListener('click', ()=>{
+      const sel = document.getElementById('modelSelect');
+      if (!sel.value) return alert('请先选择模型');
+      // 如果选项是完整 URL，不再拼接
+      const url = sel.value.startsWith('http') ? sel.value : ('models/' + sel.value);
+      loadModelByUrl(url);
+    });
+
+    document.getElementById('fileInput').addEventListener('change', e=>{
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = ()=> loadFromText(reader.result, f.name);
+      reader.readAsText(f);
+    });
+
+    document.getElementById('fitBtn').addEventListener('click', ()=> {
+      if (currentGroup) fitCameraToObject(currentGroup);
+      else alert('当前没有模型');
+    });
+
+    document.getElementById('fullscreenBtn').addEventListener('click', async ()=>{
+      try {
+        if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+        else await document.exitFullscreen();
+      } catch (e) { console.warn(e); }
+    });
+
+    // —— 自动读取 models/models.json 填充下拉 —— 
+    async function populateModels() {
+      const sel = document.getElementById('modelSelect');
+      sel.innerHTML = '<option>正在加载…</option>';
+      try {
+        const res = await fetch('models/models.json', {cache: 'no-store'});
+        if (!res.ok) throw new Error('models.json 未找到 (HTTP ' + res.status + ')');
+        const arr = await res.json();
+        if (!Array.isArray(arr)) throw new Error('models.json 内容必须是 JSON 数组');
+        sel.innerHTML = '<option value="">-- 请选择托管模型 --</option>';
+        arr.forEach(fn=>{
+          const opt = document.createElement('option');
+          opt.value = fn;
+          opt.textContent = fn;
+          sel.appendChild(opt);
+        });
+        if (arr.length>0) {
+          sel.selectedIndex = 1;
+          // 默认加载第一个
+          loadModelByUrl('models/' + arr[0]);
+        } else {
+          setStatus('models.json 为空，请上传 .ldr 并更新 models.json');
+        }
+      } catch (err) {
+        console.error('populateModels 错误：', err);
+        sel.innerHTML = '<option>无法加载模型列表</option>';
+        setStatus('无法加载 models.json：' + (err.message || err));
+      }
+    }
+    populateModels(); // 启动
+
   </script>
 </body>
 </html>
