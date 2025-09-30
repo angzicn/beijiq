@@ -53,7 +53,7 @@
     }
     /* 修改Logo样式 - 放在状态行内右侧 */
     #logo {
-      height: 16px; /* 与状态文字高度相匹配 */
+      height: 13px; /* 与状态文字高度相匹配 */
       width: auto;
       margin-left: 8px; /* 与状态文字保持一点间距 */
       vertical-align: middle;
@@ -193,7 +193,7 @@
       const center = box.getCenter(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
-      let cameraZ = Math.abs(maxDim / 2 * 1.8 / Math.tan(fov / 2));
+      let cameraZ = Math.abs(maxDim / 2 * 0.9 / Math.tan(fov / 2));  
       if (!isFinite(cameraZ) || cameraZ <= 0) cameraZ = 300;
       camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
       camera.lookAt(center);
@@ -354,3 +354,4 @@
   </script>
 </body>
 </html>
+
