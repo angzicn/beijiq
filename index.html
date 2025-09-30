@@ -202,7 +202,7 @@
     }
 
     // 更新模型下拉菜单
-    function updateModelSelect(category) {
+    function updateModelSelect(category, autoLoadModel = null) {
       const modelSelect = document.getElementById("modelSelect");
       
       if (!categoriesData || !categoriesData[category]) {
@@ -220,7 +220,19 @@
         modelSelect.appendChild(option);
       });
       
-      // 自动选择第一个模型
+      // 如果有指定要自动加载的模型，则选择它
+      if (autoLoadModel) {
+        const found = models.find(m => m.file === autoLoadModel);
+        if (found) {
+          modelSelect.value = autoLoadModel;
+          // 自动加载指定模型
+          const modelPath = `models/${category}/${autoLoadModel}`;
+          loadModelByUrl(modelPath);
+          return;
+        }
+      }
+      
+      // 否则自动选择第一个模型
       if (models.length > 0) {
         modelSelect.selectedIndex = 0;
       }
@@ -247,7 +259,7 @@
         return;
       }
       
-      // 构建模型路径 - 假设模型文件在 models/[分类名]/ 目录下
+      // 构建模型路径
       const modelPath = `models/${categorySel.value}/${modelSel.value}`;
       loadModelByUrl(modelPath);
     });
@@ -269,9 +281,30 @@
       updateModelSelect(this.value);
     });
 
+    // 获取URL参数
+    function getUrlParams() {
+      const params = {};
+      const queryString = window.location.search.substring(1);
+      const pairs = queryString.split('&');
+      
+      for (let i = 0; i < pairs.length; i++) {
+        const pair = pairs[i].split('=');
+        if (pair.length === 2) {
+          params[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1]);
+        }
+      }
+      
+      return params;
+    }
+
     async function populateCategories() {
       const categorySel = document.getElementById("categorySelect");
       categorySel.innerHTML = "<option>正在加载分类...</option>";
+      
+      // 获取URL参数
+      const urlParams = getUrlParams();
+      const urlCategory = urlParams.category;
+      const urlModel = urlParams.model;
       
       try {
         // 加载分类配置文件
@@ -288,8 +321,13 @@
           categorySel.appendChild(option);
         });
         
-        // 自动选择第一个分类
-        if (Object.keys(categoriesData).length > 0) {
+        // 如果有URL参数，则使用URL参数指定的分类和模型
+        if (urlCategory && categoriesData[urlCategory]) {
+          categorySel.value = urlCategory;
+          updateModelSelect(urlCategory, urlModel);
+        } 
+        // 否则自动选择第一个分类
+        else if (Object.keys(categoriesData).length > 0) {
           categorySel.selectedIndex = 1;
           updateModelSelect(categorySel.value);
           
