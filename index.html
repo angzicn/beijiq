@@ -30,7 +30,7 @@
       min-width: 260px;
     }
     #ui select, #ui button { margin:6px 0; width:100%; box-sizing:border-box; }
-    #status {      
+    #status { 
       margin-top:6px; 
       font-size:12px; 
       color:#333;
@@ -51,16 +51,20 @@
     .button-group button {
       flex: 1;
     }
-#logo {
-  height: 16px; /* 与状态文字高度相匹配 */
-  width: auto;
-  margin-left: 8px; /* 与状态文字保持一点间距 */
-  vertical-align: middle;
-}
+    /* 修改Logo样式 - 放在状态行内右侧 */
+    #logo {
+      height: 16px; /* 与状态文字高度相匹配 */
+      width: auto;
+      margin-left: 8px; /* 与状态文字保持一点间距 */
+      vertical-align: middle;
+    }
+    /* 添加状态文本的样式 */
+    #status-text {
+      flex: 1;
+    }
   </style>
 </head>
 <body>
-  
   <div id="ui">
     <div class="section-title">选择模型</div>
     <select id="modelSelect"><option>正在加载…</option></select>
@@ -72,9 +76,10 @@
     </div>
     
     <div id="status">
-      <span>状态：就绪</span>
+      <span id="status-text">状态：就绪</span>
       <img id="logo" src="beijiq.svg" alt="Logo">
     </div>
+  </div>
 
   <script type="module">
     import * as THREE from "three";
@@ -85,8 +90,8 @@
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xe8e8e8); // 浅浅的灰色
 
-    const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 10000); //fov 45
-    camera.position.set(300, 200, 150);  //z 300
+    const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 10000);
+    camera.position.set(300, 200, 300);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio || 1);
@@ -134,8 +139,10 @@
       currentGroup = null;
     }
 
-    const statusEl = document.getElementById("status");
-    function setStatus(t){ statusEl.innerText = "状态：" + t; }
+    const statusTextEl = document.getElementById("status-text");
+    function setStatus(t){ 
+      statusTextEl.textContent = "状态：" + t; 
+    }
 
     function loadModelByUrl(url) {
       setStatus("加载中...");
@@ -169,7 +176,7 @@
       const center = box.getCenter(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
-      let cameraZ = Math.abs(maxDim / 2 * 0.9 / Math.tan(fov / 2)); //2 * 1.8
+      let cameraZ = Math.abs(maxDim / 2 * 1.8 / Math.tan(fov / 2));
       if (!isFinite(cameraZ) || cameraZ <= 0) cameraZ = 300;
       camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
       camera.lookAt(center);
@@ -241,9 +248,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
