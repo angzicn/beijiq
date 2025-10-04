@@ -180,6 +180,7 @@
     let categoriesData = null; // 存储分类数据
     let stepFiles = []; // 存储步骤文件列表
     let currentStepIndex = -1; // 当前步骤索引
+    let currentBaseModelFile = ''; // 当前基础模型文件
     
     function clearCurrent() {
       if (!currentGroup) return;
@@ -199,13 +200,17 @@
       statusTextEl.textContent = "状态：" + t; 
     }
 
-    function loadModelByUrl(url) {
+    function loadModelByUrl(url, isStepNavigation = false) {
       setStatus("加载中...");
       clearCurrent();
       loader.load(url, 
         group => {
           currentGroup = group;
           scene.add(group);
+          
+          // 修复问题1：调整模型旋转以匹配LDView的视角
+          // 绕Y轴旋转180度，使模型正面朝向相机
+          group.rotation.y = Math.PI;
           
           // 材质更新确保颜色正确显示
           group.traverse((child) => {
@@ -214,7 +219,17 @@
             }
           });
           
-          fitCameraToObject(group);
+          // 如果是步骤导航，保持当前相机位置，否则重置视角
+          if (isStepNavigation) {
+            // 保持当前相机位置，只更新控制器目标
+            const box = new THREE.Box3().setFromObject(group);
+            const center = box.getCenter(new THREE.Vector3());
+            controls.target.copy(center);
+            controls.update();
+          } else {
+            fitCameraToObject(group);
+          }
+          
           setStatus("加载完成");
         }, 
         undefined, 
@@ -231,7 +246,7 @@
       const center = box.getCenter(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
-      let cameraZ = Math.abs(maxDim / 2 * 0.9 / Math.tan(fov / 2));
+      let cameraZ = Math.abs(maxDim / 2 * 1.8 / Math.tan(fov / 2));
       if (!isFinite(cameraZ) || cameraZ <= 0) cameraZ = 300;
       camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
       camera.lookAt(center);
@@ -263,6 +278,8 @@
         const found = models.find(m => m.file === autoLoadModel);
         if (found) {
           modelSelect.value = autoLoadModel;
+          // 设置当前基础模型文件
+          currentBaseModelFile = autoLoadModel;
           // 自动加载指定模型
           const modelPath = `models/${category}/${autoLoadModel}`;
           loadModelByUrl(modelPath);
@@ -281,6 +298,7 @@
       // 重置步骤状态
       stepFiles = [];
       currentStepIndex = -1;
+      currentBaseModelFile = baseModelFile;
       
       // 提取基础文件名（不含扩展名）
       const baseName = baseModelFile.replace('.mpd', '');
@@ -360,12 +378,11 @@
       currentStepIndex = stepIndex;
       const stepFile = stepFiles[stepIndex];
       
-      // 更新模型选择下拉框
-      const modelSelect = document.getElementById("modelSelect");
-      modelSelect.value = stepFile.file;
+      // 修复问题2：不修改模型选择下拉框的值，保持显示基础模型
+      // 这样下拉框就不会变成空白了
       
-      // 加载步骤模型
-      loadModelByUrl(stepFile.path);
+      // 加载步骤模型，并标记这是步骤导航操作
+      loadModelByUrl(stepFile.path, true);
       
       // 更新步骤导航
       updateStepNavigation();
@@ -406,6 +423,9 @@
         return;
       }
       
+      // 设置当前基础模型文件
+      currentBaseModelFile = modelSel.value;
+      
       // 构建模型路径
       const modelPath = `models/${categorySel.value}/${modelSel.value}`;
       loadModelByUrl(modelPath);
@@ -435,6 +455,8 @@
       updateModelSelect(this.value);
       // 重置步骤导航
       document.getElementById("step-navigation").style.display = 'none';
+      stepFiles = [];
+      currentStepIndex = -1;
     });
 
     // 获取URL参数
@@ -496,6 +518,9 @@
           setTimeout(() => {
             const modelSel = document.getElementById("modelSelect");
             if (modelSel.value) {
+              // 设置当前基础模型文件
+              currentBaseModelFile = modelSel.value;
+              
               const modelPath = `models/${categorySel.value}/${modelSel.value}`;
               loadModelByUrl(modelPath);
               
@@ -518,4 +543,3 @@
   </script>
 </body>
 </html>
-
