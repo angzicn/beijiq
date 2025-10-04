@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -197,6 +196,7 @@
     let stepCameraStates = {}; // 存储每个步骤的相机状态
     let isSwitchingStep = false; // 标记是否正在切换步骤
     let currentLoadId = 0; // 当前加载的ID，用于防止竞态条件
+    let currentModelCenter = new THREE.Vector3(); // 当前模型的中心点
     
     function clearCurrent() {
       if (!currentGroup) return;
@@ -239,6 +239,13 @@
       return false;
     }
 
+    // 计算模型的中心点
+    function computeModelCenter(group) {
+      const box = new THREE.Box3().setFromObject(group);
+      const center = box.getCenter(new THREE.Vector3());
+      return center;
+    }
+
     function loadModelByUrl(url, isStepNavigation = false, stepPath = null) {
       const loadId = ++currentLoadId;
       
@@ -266,6 +273,9 @@
               child.material.needsUpdate = true;
             }
           });
+          
+          // 计算当前模型的中心点
+          currentModelCenter = computeModelCenter(group);
           
           // 如果是步骤导航，尝试恢复保存的相机状态
           if (isStepNavigation && stepPath) {
@@ -556,7 +566,7 @@
       }
     });
 
-    // 修复全屏按钮 - 修正拼写错误
+    // 修复全屏按钮
     document.getElementById("fullscreenBtn").addEventListener("click", async ()=>{
       if (!document.fullscreenElement) {
         try {
