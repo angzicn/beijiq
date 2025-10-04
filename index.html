@@ -210,7 +210,7 @@
           
           // 修复问题1：调整模型旋转以匹配LDView的视角
           // 绕Y轴旋转180度，使模型正面朝向相机
-          group.rotation.y = Math.PI;
+          group.rotation.x = Math.PI;
           
           // 材质更新确保颜色正确显示
           group.traverse((child) => {
@@ -543,3 +543,4 @@
   </script>
 </body>
 </html>
+
