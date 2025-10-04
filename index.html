@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -195,6 +196,7 @@
     let currentBaseModelFile = ''; // 当前基础模型文件
     let stepCameraStates = {}; // 存储每个步骤的相机状态
     let isSwitchingStep = false; // 标记是否正在切换步骤
+    let currentLoadId = 0; // 当前加载的ID，用于防止竞态条件
     
     function clearCurrent() {
       if (!currentGroup) return;
@@ -238,10 +240,19 @@
     }
 
     function loadModelByUrl(url, isStepNavigation = false, stepPath = null) {
+      const loadId = ++currentLoadId;
+      
       setStatus("加载中...");
       clearCurrent();
+      
       loader.load(url, 
         group => {
+          // 检查是否是最新的加载请求
+          if (loadId !== currentLoadId) {
+            console.log("忽略过期的加载请求:", url);
+            return;
+          }
+          
           currentGroup = group;
           scene.add(group);
           
@@ -278,6 +289,12 @@
         }, 
         undefined, 
         err => {
+          // 检查是否是最新的加载请求
+          if (loadId !== currentLoadId) {
+            console.log("忽略过期的加载错误:", url);
+            return;
+          }
+          
           console.error("加载错误:", err);
           setStatus("加载失败");
         }
@@ -539,11 +556,20 @@
       }
     });
 
+    // 修复全屏按钮 - 修正拼写错误
     document.getElementById("fullscreenBtn").addEventListener("click", async ()=>{
       if (!document.fullscreenElement) {
-        await document.documentElement.requestFullstation();
+        try {
+          await document.documentElement.requestFullscreen();
+        } catch (err) {
+          console.error('全屏请求失败:', err);
+        }
       } else {
-        await document.exitFullscreen();
+        try {
+          await document.exitFullscreen();
+        } catch (err) {
+          console.error('退出全屏失败:', err);
+        }
       }
     });
 
