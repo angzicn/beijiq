@@ -193,6 +193,8 @@
     let stepFiles = []; // 存储步骤文件列表
     let currentStepIndex = -1; // 当前步骤索引
     let currentBaseModelFile = ''; // 当前基础模型文件
+    let stepCameraStates = {}; // 存储每个步骤的相机状态
+    let isSwitchingStep = false; // 标记是否正在切换步骤
     
     function clearCurrent() {
       if (!currentGroup) return;
@@ -212,7 +214,30 @@
       statusTextEl.textContent = "状态：" + t; 
     }
 
-    function loadModelByUrl(url, isStepNavigation = false) {
+    // 保存当前相机状态
+    function saveCameraState(stepPath) {
+      stepCameraStates[stepPath] = {
+        position: camera.position.clone(),
+        target: controls.target.clone(),
+        zoom: camera.zoom
+      };
+    }
+
+    // 恢复相机状态
+    function restoreCameraState(stepPath) {
+      if (stepCameraStates[stepPath]) {
+        const state = stepCameraStates[stepPath];
+        camera.position.copy(state.position);
+        controls.target.copy(state.target);
+        camera.zoom = state.zoom;
+        camera.updateProjectionMatrix();
+        controls.update();
+        return true;
+      }
+      return false;
+    }
+
+    function loadModelByUrl(url, isStepNavigation = false, stepPath = null) {
       setStatus("加载中...");
       clearCurrent();
       loader.load(url, 
@@ -220,7 +245,7 @@
           currentGroup = group;
           scene.add(group);
           
-          // 修复问题1：调整模型旋转以匹配LDView的视角
+          // 调整模型旋转以匹配LDView的视角
           // 绕X轴旋转180度，使模型正面朝向相机
           group.rotation.x = Math.PI;
           
@@ -231,15 +256,22 @@
             }
           });
           
-          // 如果是步骤导航，保持当前相机位置，否则重置视角
-          if (isStepNavigation) {
-            // 保持当前相机位置，只更新控制器目标
-            const box = new THREE.Box3().setFromObject(group);
-            const center = box.getCenter(new THREE.Vector3());
-            controls.target.copy(center);
-            controls.update();
+          // 如果是步骤导航，尝试恢复保存的相机状态
+          if (isStepNavigation && stepPath) {
+            const hasSavedState = restoreCameraState(stepPath);
+            if (!hasSavedState) {
+              // 如果没有保存的状态，使用适应视角并保存
+              fitCameraToObject(group);
+              saveCameraState(stepPath);
+            }
           } else {
+            // 不是步骤导航，使用适应视角
             fitCameraToObject(group);
+            
+            // 如果是基础模型，保存初始状态
+            if (stepPath) {
+              saveCameraState(stepPath);
+            }
           }
           
           setStatus("加载完成");
@@ -388,17 +420,28 @@
     function goToStep(stepIndex) {
       if (stepIndex < 0 || stepIndex >= stepFiles.length) return;
       
+      // 标记正在切换步骤
+      isSwitchingStep = true;
+      
+      // 保存当前步骤的相机状态
+      if (currentStepIndex >= 0) {
+        const currentStepFile = stepFiles[currentStepIndex];
+        saveCameraState(currentStepFile.path);
+      }
+      
       currentStepIndex = stepIndex;
       const stepFile = stepFiles[stepIndex];
       
-      // 修复问题2：不修改模型选择下拉框的值，保持显示基础模型
-      // 这样下拉框就不会变成空白了
-      
       // 加载步骤模型，并标记这是步骤导航操作
-      loadModelByUrl(stepFile.path, true);
+      loadModelByUrl(stepFile.path, true, stepFile.path);
       
       // 更新步骤导航
       updateStepNavigation();
+      
+      // 重置切换标记
+      setTimeout(() => {
+        isSwitchingStep = false;
+      }, 100);
     }
 
     // 下一步
@@ -450,6 +493,12 @@
     function animate(){ 
       requestAnimationFrame(animate); 
       renderer.render(scene, camera); 
+      
+      // 如果不是正在切换步骤，并且有当前步骤，则自动保存相机状态
+      if (!isSwitchingStep && currentStepIndex >= 0 && stepFiles[currentStepIndex]) {
+        const currentStepFile = stepFiles[currentStepIndex];
+        saveCameraState(currentStepFile.path);
+      }
     }
     animate();
 
@@ -480,12 +529,19 @@
     });
 
     document.getElementById("fitBtn").addEventListener("click", ()=>{
-      if (currentGroup) fitCameraToObject(currentGroup);
+      if (currentGroup) {
+        fitCameraToObject(currentGroup);
+        // 如果是步骤导航中的模型，保存新的自适应视角
+        if (currentStepIndex >= 0) {
+          const currentStepFile = stepFiles[currentStepIndex];
+          saveCameraState(currentStepFile.path);
+        }
+      }
     });
 
     document.getElementById("fullscreenBtn").addEventListener("click", async ()=>{
       if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
+        await document.documentElement.requestFullstation();
       } else {
         await document.exitFullscreen();
       }
@@ -505,6 +561,8 @@
       document.getElementById("step-navigation").style.display = 'none';
       stepFiles = [];
       currentStepIndex = -1;
+      // 清空步骤相机状态
+      stepCameraStates = {};
     });
 
     // 获取URL参数
