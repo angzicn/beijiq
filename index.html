@@ -53,7 +53,7 @@
     }
     /* 修改Logo样式 - 放在状态行内右侧 */
     #logo {
-      height: 13px; /* 与状态文字高度相匹配 */
+      height: 16px; /* 与状态文字高度相匹配 */
       width: auto;
       margin-left: 8px; /* 与状态文字保持一点间距 */
       vertical-align: middle;
@@ -67,6 +67,30 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
+    }
+    /* 步骤导航样式 */
+    #step-navigation {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e0e0e0;
+      display: none; /* 默认隐藏 */
+    }
+    .step-controls {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+    .step-controls button {
+      flex: 1;
+    }
+    .step-indicator {
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+    }
+    .step-title {
+      font-weight: bold;
+      margin-bottom: 4px;
     }
   </style>
 </head>
@@ -93,6 +117,18 @@
     <div id="status">
       <span id="status-text">状态：就绪</span>
       <img id="logo" src="beijiq.svg" alt="Logo">
+    </div>
+    
+    <!-- 步骤导航 -->
+    <div id="step-navigation">
+      <div class="step-title">步骤导航</div>
+      <div class="step-controls">
+        <button id="prevStepBtn">上一页</button>
+        <button id="nextStepBtn">下一页</button>
+      </div>
+      <div class="step-indicator">
+        <span id="step-info">步骤: -/-</span>
+      </div>
     </div>
   </div>
 
@@ -142,6 +178,8 @@
 
     let currentGroup = null;
     let categoriesData = null; // 存储分类数据
+    let stepFiles = []; // 存储步骤文件列表
+    let currentStepIndex = -1; // 当前步骤索引
     
     function clearCurrent() {
       if (!currentGroup) return;
@@ -193,7 +231,7 @@
       const center = box.getCenter(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
-      let cameraZ = Math.abs(maxDim / 2 * 0.9 / Math.tan(fov / 2));  
+      let cameraZ = Math.abs(maxDim / 2 * 1.8 / Math.tan(fov / 2));
       if (!isFinite(cameraZ) || cameraZ <= 0) cameraZ = 300;
       camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
       camera.lookAt(center);
@@ -238,6 +276,115 @@
       }
     }
 
+    // 检测步骤文件
+    async function detectStepFiles(category, baseModelFile) {
+      // 重置步骤状态
+      stepFiles = [];
+      currentStepIndex = -1;
+      
+      // 提取基础文件名（不含扩展名）
+      const baseName = baseModelFile.replace('.mpd', '');
+      
+      // 构建可能的步骤文件模式
+      const stepPatterns = [
+        baseName + '.mpd', // 基础文件本身
+        baseName + '_01.mpd',
+        baseName + '_02.mpd',
+        baseName + '_03.mpd',
+        baseName + '_04.mpd',
+        baseName + '_05.mpd',
+        baseName + '_06.mpd',
+        baseName + '_07.mpd',
+        baseName + '_08.mpd',
+        baseName + '_09.mpd',
+        baseName + '_10.mpd'
+      ];
+      
+      // 检查每个步骤文件是否存在
+      for (let i = 0; i < stepPatterns.length; i++) {
+        const filePath = `models/${category}/${stepPatterns[i]}`;
+        try {
+          const response = await fetch(filePath, { method: 'HEAD' });
+          if (response.ok) {
+            stepFiles.push({
+              file: stepPatterns[i],
+              path: filePath
+            });
+            
+            // 如果这是当前加载的文件，设置当前步骤索引
+            if (stepPatterns[i] === baseModelFile) {
+              currentStepIndex = stepFiles.length - 1;
+            }
+          }
+        } catch (error) {
+          // 文件不存在，继续检查下一个
+        }
+      }
+      
+      // 如果没有找到当前文件的索引，但找到了其他步骤文件，
+      // 则将第一个步骤文件设为当前文件
+      if (currentStepIndex === -1 && stepFiles.length > 0) {
+        currentStepIndex = 0;
+      }
+      
+      // 更新步骤导航UI
+      updateStepNavigation();
+    }
+
+    // 更新步骤导航UI
+    function updateStepNavigation() {
+      const stepNav = document.getElementById("step-navigation");
+      const prevBtn = document.getElementById("prevStepBtn");
+      const nextBtn = document.getElementById("nextStepBtn");
+      const stepInfo = document.getElementById("step-info");
+      
+      // 如果有多个步骤文件，显示导航
+      if (stepFiles.length > 1) {
+        stepNav.style.display = 'block';
+        
+        // 更新步骤信息
+        stepInfo.textContent = `步骤: ${currentStepIndex + 1}/${stepFiles.length}`;
+        
+        // 更新按钮状态
+        prevBtn.disabled = currentStepIndex <= 0;
+        nextBtn.disabled = currentStepIndex >= stepFiles.length - 1;
+      } else {
+        stepNav.style.display = 'none';
+      }
+    }
+
+    // 切换到指定步骤
+    function goToStep(stepIndex) {
+      if (stepIndex < 0 || stepIndex >= stepFiles.length) return;
+      
+      currentStepIndex = stepIndex;
+      const stepFile = stepFiles[stepIndex];
+      
+      // 更新模型选择下拉框
+      const modelSelect = document.getElementById("modelSelect");
+      modelSelect.value = stepFile.file;
+      
+      // 加载步骤模型
+      loadModelByUrl(stepFile.path);
+      
+      // 更新步骤导航
+      updateStepNavigation();
+    }
+
+    // 下一步
+    function nextStep() {
+      if (currentStepIndex < stepFiles.length - 1) {
+        goToStep(currentStepIndex + 1);
+      }
+    }
+
+    // 上一步
+    function prevStep() {
+      if (currentStepIndex > 0) {
+        goToStep(currentStepIndex - 1);
+      }
+    }
+
     function animate(){ 
       requestAnimationFrame(animate); 
       renderer.render(scene, camera); 
@@ -262,6 +409,9 @@
       // 构建模型路径
       const modelPath = `models/${categorySel.value}/${modelSel.value}`;
       loadModelByUrl(modelPath);
+      
+      // 检测步骤文件
+      detectStepFiles(categorySel.value, modelSel.value);
     });
 
     document.getElementById("fitBtn").addEventListener("click", ()=>{
@@ -276,9 +426,15 @@
       }
     });
 
+    // 步骤导航按钮事件
+    document.getElementById("prevStepBtn").addEventListener("click", prevStep);
+    document.getElementById("nextStepBtn").addEventListener("click", nextStep);
+
     // 分类选择改变事件
     document.getElementById("categorySelect").addEventListener("change", function() {
       updateModelSelect(this.value);
+      // 重置步骤导航
+      document.getElementById("step-navigation").style.display = 'none';
     });
 
     // 获取URL参数
@@ -325,6 +481,11 @@
         if (urlCategory && categoriesData[urlCategory]) {
           categorySel.value = urlCategory;
           updateModelSelect(urlCategory, urlModel);
+          
+          // 检测步骤文件
+          if (urlModel) {
+            detectStepFiles(urlCategory, urlModel);
+          }
         } 
         // 否则自动选择第一个分类
         else if (Object.keys(categoriesData).length > 0) {
@@ -337,6 +498,9 @@
             if (modelSel.value) {
               const modelPath = `models/${categorySel.value}/${modelSel.value}`;
               loadModelByUrl(modelPath);
+              
+              // 检测步骤文件
+              detectStepFiles(categorySel.value, modelSel.value);
             }
           }, 100);
         }
@@ -354,4 +518,3 @@
   </script>
 </body>
 </html>
-
