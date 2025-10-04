@@ -231,7 +231,7 @@
       const center = box.getCenter(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
-      let cameraZ = Math.abs(maxDim / 2 * 1.8 / Math.tan(fov / 2));
+      let cameraZ = Math.abs(maxDim / 2 * 0.9 / Math.tan(fov / 2));
       if (!isFinite(cameraZ) || cameraZ <= 0) cameraZ = 300;
       camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
       camera.lookAt(center);
@@ -518,3 +518,4 @@
   </script>
 </body>
 </html>
+
