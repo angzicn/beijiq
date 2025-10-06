@@ -248,6 +248,7 @@
     let currentLoadId = 0; // 当前加载的ID，用于防止竞态条件
     let currentModelCenter = new THREE.Vector3(); // 当前模型的中心点
     let verifiedSteps = new Set(); // 存储已验证通过的步骤路径
+    let totalSteps = 0; // 总步骤数（不包含_00文件）
     
     function clearCurrent() {
       if (!currentGroup) return;
@@ -422,6 +423,7 @@
       stepFiles = [];
       currentStepIndex = -1;
       currentBaseModelFile = baseModelFile;
+      totalSteps = 0;
       
       // 提取基础文件名（不含扩展名）
       const baseName = baseModelFile.replace('.mpd', '');
@@ -463,6 +465,25 @@
         }
       }
       
+      // 计算总步骤数（不包含_00文件）
+      stepFiles.forEach(step => {
+        if (step.file.includes('_00.mpd')) {
+          // 跳过_00文件
+          return;
+        }
+        
+        // 尝试从文件名中提取步骤编号
+        const match = step.file.match(/_(\d+)\.mpd$/);
+        if (match) {
+          const stepNum = parseInt(match[1]);
+          if (stepNum > totalSteps) {
+            totalSteps = stepNum;
+          }
+        } else if (step.file === baseName + '.mpd') {
+          // 基础文件，不增加总步骤数
+        }
+      });
+      
       // 如果没有找到当前文件的索引，但找到了其他步骤文件，
       // 则将基础文件设为当前文件
       if (currentStepIndex === -1 && stepFiles.length > 0) {
@@ -491,7 +512,28 @@
         stepNav.style.display = 'block';
         
         // 更新步骤信息
-        stepInfo.textContent = `步骤: ${currentStepIndex + 1}/${stepFiles.length}`;
+        const currentStepFile = stepFiles[currentStepIndex];
+        
+        // 如果是_00文件，不显示步骤信息
+        if (currentStepFile.file.includes('_00.mpd')) {
+          stepInfo.textContent = "";
+        } else {
+          // 计算当前步骤编号
+          let currentStepNum = 0;
+          
+          if (currentStepFile.file === currentBaseModelFile) {
+            // 基础文件，步骤编号为0
+            currentStepNum = 0;
+          } else {
+            // 从文件名中提取步骤编号
+            const match = currentStepFile.file.match(/_(\d+)\.mpd$/);
+            if (match) {
+              currentStepNum = parseInt(match[1]);
+            }
+          }
+          
+          stepInfo.textContent = `步骤: ${currentStepNum}/${totalSteps}`;
+        }
         
         // 更新按钮状态
         prevBtn.disabled = currentStepIndex <= 0;
