@@ -101,6 +101,43 @@
     .load-copy-group button {
       flex: 1;
     }
+    /* 密码弹窗样式 */
+    #password-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    #password-dialog {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      width: 300px;
+    }
+    #password-dialog h3 {
+      margin-top: 0;
+      margin-bottom: 15px;
+    }
+    #password-input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 15px;
+      box-sizing: border-box;
+    }
+    .password-buttons {
+      display: flex;
+      gap: 10px;
+    }
+    .password-buttons button {
+      flex: 1;
+    }
   </style>
 </head>
 <body>
@@ -140,6 +177,19 @@
       </div>
       <div class="step-indicator">
         <span id="step-info">步骤: -/-</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 密码弹窗 -->
+  <div id="password-modal">
+    <div id="password-dialog">
+      <h3>需要密码</h3>
+      <p>访问此步骤需要输入密码：</p>
+      <input type="password" id="password-input" placeholder="请输入密码">
+      <div class="password-buttons">
+        <button id="password-cancel">取消</button>
+        <button id="password-confirm">确认</button>
       </div>
     </div>
   </div>
@@ -197,6 +247,7 @@
     let isSwitchingStep = false; // 标记是否正在切换步骤
     let currentLoadId = 0; // 当前加载的ID，用于防止竞态条件
     let currentModelCenter = new THREE.Vector3(); // 当前模型的中心点
+    let verifiedSteps = new Set(); // 存储已验证通过的步骤路径
     
     function clearCurrent() {
       if (!currentGroup) return;
@@ -377,6 +428,7 @@
       
       // 构建可能的步骤文件模式
       const stepPatterns = [
+        baseName + '_00.mpd', // 特殊步骤，需要密码
         baseName + '.mpd', // 基础文件本身
         baseName + '_01.mpd',
         baseName + '_02.mpd',
@@ -412,9 +464,15 @@
       }
       
       // 如果没有找到当前文件的索引，但找到了其他步骤文件，
-      // 则将第一个步骤文件设为当前文件
+      // 则将基础文件设为当前文件
       if (currentStepIndex === -1 && stepFiles.length > 0) {
-        currentStepIndex = 0;
+        // 查找基础文件（不含_00等后缀）
+        const baseFileIndex = stepFiles.findIndex(step => step.file === baseName + '.mpd');
+        if (baseFileIndex !== -1) {
+          currentStepIndex = baseFileIndex;
+        } else {
+          currentStepIndex = 0;
+        }
       }
       
       // 更新步骤导航UI
@@ -443,10 +501,62 @@
       }
     }
 
-    // 切换到指定步骤
-    function goToStep(stepIndex) {
-      if (stepIndex < 0 || stepIndex >= stepFiles.length) return;
+    // 显示密码弹窗
+    function showPasswordModal(stepIndex, stepFile) {
+      const modal = document.getElementById("password-modal");
+      const passwordInput = document.getElementById("password-input");
       
+      // 重置输入框
+      passwordInput.value = "";
+      
+      // 显示弹窗
+      modal.style.display = "flex";
+      
+      // 设置确认按钮的回调
+      const confirmBtn = document.getElementById("password-confirm");
+      const cancelBtn = document.getElementById("password-cancel");
+      
+      // 移除之前的事件监听器
+      const newConfirmBtn = confirmBtn.cloneNode(true);
+      const newCancelBtn = cancelBtn.cloneNode(true);
+      
+      confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+      cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+      
+      // 添加新的事件监听器
+      newConfirmBtn.addEventListener("click", function() {
+        const password = passwordInput.value;
+        if (password === "beijiquan") {
+          // 密码正确，标记为已验证
+          verifiedSteps.add(stepFile.path);
+          // 关闭弹窗
+          modal.style.display = "none";
+          // 继续切换到目标步骤
+          continueToStep(stepIndex, stepFile);
+        } else {
+          alert("密码错误，请重新输入！");
+          passwordInput.value = "";
+          passwordInput.focus();
+        }
+      });
+      
+      newCancelBtn.addEventListener("click", function() {
+        modal.style.display = "none";
+      });
+      
+      // 聚焦到输入框
+      passwordInput.focus();
+      
+      // 按Enter键确认
+      passwordInput.addEventListener("keypress", function(e) {
+        if (e.key === "Enter") {
+          newConfirmBtn.click();
+        }
+      });
+    }
+
+    // 继续切换到指定步骤（在密码验证通过后）
+    function continueToStep(stepIndex, stepFile) {
       // 标记正在切换步骤
       isSwitchingStep = true;
       
@@ -457,7 +567,6 @@
       }
       
       currentStepIndex = stepIndex;
-      const stepFile = stepFiles[stepIndex];
       
       // 加载步骤模型，并标记这是步骤导航操作
       loadModelByUrl(stepFile.path, true, stepFile.path);
@@ -469,6 +578,23 @@
       setTimeout(() => {
         isSwitchingStep = false;
       }, 100);
+    }
+
+    // 切换到指定步骤
+    function goToStep(stepIndex) {
+      if (stepIndex < 0 || stepIndex >= stepFiles.length) return;
+      
+      const stepFile = stepFiles[stepIndex];
+      
+      // 检查是否为需要密码的步骤（_00文件）且尚未验证
+      if (stepFile.file.includes('_00.mpd') && !verifiedSteps.has(stepFile.path)) {
+        // 显示密码弹窗
+        showPasswordModal(stepIndex, stepFile);
+        return;
+      }
+      
+      // 不需要密码或已验证，直接切换
+      continueToStep(stepIndex, stepFile);
     }
 
     // 下一步
@@ -599,6 +725,8 @@
       currentStepIndex = -1;
       // 清空步骤相机状态
       stepCameraStates = {};
+      // 清空已验证步骤
+      verifiedSteps.clear();
     });
 
     // 获取URL参数
