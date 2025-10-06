@@ -255,6 +255,13 @@
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0,0,0);
+    controls.enableDamping = true; // 添加阻尼效果
+    controls.dampingFactor = 0.05;
+    controls.screenSpacePanning = false;
+    controls.minDistance = 10;
+    controls.maxDistance = 5000;
+    controls.maxPolarAngle = Math.PI; // 允许完全上下旋转
+    controls.minPolarAngle = 0; // 允许从底部查看
     controls.update();
 
     // 光线 - 增强光照效果
@@ -286,7 +293,8 @@
     let isRotating = false; // 是否正在自动旋转
     let rotationSpeed = 0.005; // 旋转速度
     let initialModelRotation = new THREE.Quaternion(); // 存储模型的初始旋转状态
-    
+    let initialCameraState = null; // 新增：存储初始视角状态
+
     function clearCurrent() {
       if (!currentGroup) return;
       scene.remove(currentGroup);
@@ -298,6 +306,7 @@
         }
       });
       currentGroup = null;
+      initialCameraState = null; // 重置初始视角状态
     }
 
     const statusTextEl = document.getElementById("status-text");
@@ -387,6 +396,16 @@
           
           // 保存模型的初始旋转状态
           initialModelRotation.copy(group.quaternion);
+          
+          // 保存初始视角状态（仅第一次加载时）
+          if (!initialCameraState && !isStepNavigation) {
+            initialCameraState = {
+              position: camera.position.clone(),
+              target: controls.target.clone(),
+              zoom: camera.zoom,
+              modelRotation: group.quaternion.clone()
+            };
+          }
           
           // 如果是步骤导航，尝试恢复保存的相机状态
           if (isStepNavigation && stepPath) {
@@ -484,21 +503,14 @@
       controls.target.copy(center);
       controls.update();
       
-      // 保存当前视角状态
-      if (currentStepIndex >= 0) {
-        const currentStepFile = stepFiles[currentStepIndex];
-        saveCameraState(currentStepFile.path);
-      }
+      // 注意：这里不再自动保存状态到当前步骤
     }
 
     // 切换旋转状态
     function toggleRotation() {
       if (isRotating) {
-        // 停止旋转时，恢复模型的初始旋转状态
-        if (currentGroup) {
-          currentGroup.quaternion.copy(initialModelRotation);
-        }
         stopRotation();
+        // 注意：不再恢复初始旋转状态，保持当前旋转角度
       } else {
         isRotating = true;
         const rotateBtn = document.getElementById('rotateBtn');
@@ -825,6 +837,9 @@
         currentGroup.rotation.y += rotationSpeed;
       }
       
+      // 更新 controls（启用阻尼时需要）
+      controls.update();
+      
       // 如果不是正在切换步骤，并且有当前步骤，则自动保存相机状态
       if (!isSwitchingStep && currentStepIndex >= 0 && stepFiles[currentStepIndex]) {
         const currentStepFile = stepFiles[currentStepIndex];
@@ -849,18 +864,19 @@
     document.getElementById("frontViewBtn").addEventListener("click", () => setStandardView('front'));
     document.getElementById("backViewBtn").addEventListener("click", () => setStandardView('back'));
     document.getElementById("defaultViewBtn").addEventListener("click", () => {
-      if (currentGroup) {
-        // 停止旋转
+      if (currentGroup && initialCameraState) {
         stopRotation();
-        // 恢复模型的初始旋转状态
-        currentGroup.quaternion.copy(initialModelRotation);
-        // 重置相机视角
-        fitCameraToObject(currentGroup);
-        // 保存当前状态
-        if (currentStepIndex >= 0) {
-          const currentStepFile = stepFiles[currentStepIndex];
-          saveCameraState(currentStepFile.path);
-        }
+        
+        // 恢复初始视角
+        camera.position.copy(initialCameraState.position);
+        controls.target.copy(initialCameraState.target);
+        camera.zoom = initialCameraState.zoom;
+        camera.updateProjectionMatrix();
+        
+        // 恢复模型初始旋转
+        currentGroup.quaternion.copy(initialCameraState.modelRotation);
+        
+        controls.update();
       }
     });
     document.getElementById("rotateBtn").addEventListener("click", toggleRotation);
