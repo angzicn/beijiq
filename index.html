@@ -101,21 +101,14 @@
     .load-copy-group button {
       flex: 1;
     }
-    /* 视角调整板块样式 */
-    #view-controls {
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid #e0e0e0;
-    }
-    .view-controls-row {
+    /* 视角控制按钮组 */
+    .view-controls-group {
       display: flex;
       gap: 5px;
-      margin-bottom: 6px;
+      margin-top: 8px;
     }
-    .view-controls-row button {
+    .view-controls-group button {
       flex: 1;
-      font-size: 12px;
-      padding: 6px 4px;
     }
     /* 密码弹窗样式 */
     #password-modal {
@@ -155,7 +148,7 @@
       flex: 1;
     }
     /* 旋转按钮激活状态 */
-    #rotateBtn.active {
+    #rotateModelBtn.active {
       background-color: #4CAF50;
       color: white;
     }
@@ -180,21 +173,10 @@
       <button id="fullscreenBtn">全屏</button>
     </div>
     
-    <!-- 视角调整板块 -->
-    <div id="view-controls">
-      <div class="section-title">视角调整</div>
-      <div class="view-controls-row">
-        <button id="topViewBtn">上</button>
-        <button id="bottomViewBtn">下</button>
-        <button id="leftViewBtn">左</button>
-        <button id="rightViewBtn">右</button>
-      </div>
-      <div class="view-controls-row">
-        <button id="frontViewBtn">前</button>
-        <button id="backViewBtn">后</button>
-        <button id="defaultViewBtn">默认</button>
-        <button id="rotateBtn">旋转</button>
-      </div>
+    <!-- 视角控制按钮 -->
+    <div class="view-controls-group">
+      <button id="resetViewBtn">视野自适应</button>
+      <button id="rotateModelBtn">旋转模型</button>
     </div>
     
     <div id="status">
@@ -274,8 +256,6 @@
     dl2.position.set(-100, -100, -100);
     scene.add(dl2);
 
-    // 注意：移除了地面网格
-
     // LDraw Loader - 使用打包后的MPD文件，不需要零件库路径
     const loader = new LDrawLoader();
 
@@ -293,7 +273,7 @@
     let isRotating = false; // 是否正在自动旋转
     let rotationSpeed = 0.005; // 旋转速度
     let initialModelRotation = new THREE.Quaternion(); // 存储模型的初始旋转状态
-    let initialCameraState = null; // 新增：存储初始视角状态
+    let initialCameraState = null; // 存储初始视角状态
 
     function clearCurrent() {
       if (!currentGroup) return;
@@ -355,7 +335,7 @@
     function stopRotation() {
       if (isRotating) {
         isRotating = false;
-        const rotateBtn = document.getElementById('rotateBtn');
+        const rotateBtn = document.getElementById('rotateModelBtn');
         rotateBtn.classList.remove('active');
         if (currentGroup) {
           setStatus("旋转已停止");
@@ -447,7 +427,6 @@
       const center = box.getCenter(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
-      // 修改：将系数从1.8改为0.9
       let cameraZ = Math.abs(maxDim / 2 * 0.9 / Math.tan(fov / 2));
       if (!isFinite(cameraZ) || cameraZ <= 0) cameraZ = 300;
       camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
@@ -456,54 +435,22 @@
       controls.update();
     }
 
-    // 设置标准视图
-    function setStandardView(direction) {
-      if (!currentGroup) return;
-      
-      // 停止旋转
-      stopRotation();
-      
-      const box = new THREE.Box3().setFromObject(currentGroup);
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const distance = maxDim * 1.5; // 设置合适的距离
-      
-      // 重置模型旋转到初始状态
-      currentGroup.quaternion.copy(initialModelRotation);
-      
-      switch(direction) {
-        case 'top':
-          camera.position.set(center.x, center.y + distance, center.z);
-          camera.up.set(0, 0, -1);
-          break;
-        case 'bottom':
-          camera.position.set(center.x, center.y - distance, center.z);
-          camera.up.set(0, 0, 1);
-          break;
-        case 'left':
-          camera.position.set(center.x - distance, center.y, center.z);
-          camera.up.set(0, 1, 0);
-          break;
-        case 'right':
-          camera.position.set(center.x + distance, center.y, center.z);
-          camera.up.set(0, 1, 0);
-          break;
-        case 'front':
-          camera.position.set(center.x, center.y, center.z + distance);
-          camera.up.set(0, 1, 0);
-          break;
-        case 'back':
-          camera.position.set(center.x, center.y, center.z - distance);
-          camera.up.set(0, 1, 0);
-          break;
+    // 视野自适应按钮功能
+    function resetView() {
+      if (currentGroup && initialCameraState) {
+        stopRotation();
+        
+        // 恢复初始视角
+        camera.position.copy(initialCameraState.position);
+        controls.target.copy(initialCameraState.target);
+        camera.zoom = initialCameraState.zoom;
+        camera.updateProjectionMatrix();
+        
+        // 恢复模型初始旋转
+        currentGroup.quaternion.copy(initialCameraState.modelRotation);
+        
+        controls.update();
       }
-      
-      camera.lookAt(center);
-      controls.target.copy(center);
-      controls.update();
-      
-      // 注意：这里不再自动保存状态到当前步骤
     }
 
     // 切换旋转状态
@@ -513,7 +460,7 @@
         // 注意：不再恢复初始旋转状态，保持当前旋转角度
       } else {
         isRotating = true;
-        const rotateBtn = document.getElementById('rotateBtn');
+        const rotateBtn = document.getElementById('rotateModelBtn');
         rotateBtn.classList.add('active');
         setStatus("自动旋转中...");
       }
@@ -832,7 +779,7 @@
     function animate(){ 
       requestAnimationFrame(animate); 
       
-      // 如果正在自动旋转，绕Y轴旋转模型（修正问题1）
+      // 如果正在自动旋转，绕Y轴旋转模型
       if (isRotating && currentGroup) {
         currentGroup.rotation.y += rotationSpeed;
       }
@@ -856,30 +803,11 @@
       renderer.setSize(innerWidth, innerHeight);
     });
 
-    // 视角调整按钮事件
-    document.getElementById("topViewBtn").addEventListener("click", () => setStandardView('top'));
-    document.getElementById("bottomViewBtn").addEventListener("click", () => setStandardView('bottom'));
-    document.getElementById("leftViewBtn").addEventListener("click", () => setStandardView('left'));
-    document.getElementById("rightViewBtn").addEventListener("click", () => setStandardView('right'));
-    document.getElementById("frontViewBtn").addEventListener("click", () => setStandardView('front'));
-    document.getElementById("backViewBtn").addEventListener("click", () => setStandardView('back'));
-    document.getElementById("defaultViewBtn").addEventListener("click", () => {
-      if (currentGroup && initialCameraState) {
-        stopRotation();
-        
-        // 恢复初始视角
-        camera.position.copy(initialCameraState.position);
-        controls.target.copy(initialCameraState.target);
-        camera.zoom = initialCameraState.zoom;
-        camera.updateProjectionMatrix();
-        
-        // 恢复模型初始旋转
-        currentGroup.quaternion.copy(initialCameraState.modelRotation);
-        
-        controls.update();
-      }
-    });
-    document.getElementById("rotateBtn").addEventListener("click", toggleRotation);
+    // 视野自适应按钮事件
+    document.getElementById("resetViewBtn").addEventListener("click", resetView);
+    
+    // 旋转模型按钮事件
+    document.getElementById("rotateModelBtn").addEventListener("click", toggleRotation);
 
     // 当用户开始交互时停止自动旋转
     controls.addEventListener('start', () => {
