@@ -101,15 +101,6 @@
     .load-copy-group button {
       flex: 1;
     }
-    /* 视角控制按钮组 */
-    .view-controls-group {
-      display: flex;
-      gap: 5px;
-      margin-top: 8px;
-    }
-    .view-controls-group button {
-      flex: 1;
-    }
     /* 密码弹窗样式 */
     #password-modal {
       display: none;
@@ -147,11 +138,6 @@
     .password-buttons button {
       flex: 1;
     }
-    /* 旋转按钮激活状态 */
-    #rotateModelBtn.active {
-      background-color: #4CAF50;
-      color: white;
-    }
   </style>
 </head>
 <body>
@@ -170,13 +156,11 @@
     <div class="load-copy-group">
       <button id="loadBtn">加载模型</button>
       <button id="copyLinkBtn">复制链接</button>
-      <button id="fullscreenBtn">全屏</button>
     </div>
     
-    <!-- 视角控制按钮 -->
-    <div class="view-controls-group">
-      <button id="resetViewBtn">视野自适应</button>
-      <button id="rotateModelBtn">旋转模型</button>
+    <div class="button-group">
+      <button id="fitBtn">视野自适应</button>
+      <button id="fullscreenBtn">全屏</button>
     </div>
     
     <div id="status">
@@ -237,13 +221,6 @@
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0,0,0);
-    controls.enableDamping = true; // 添加阻尼效果
-    controls.dampingFactor = 0.05;
-    controls.screenSpacePanning = false;
-    controls.minDistance = 10;
-    controls.maxDistance = 5000;
-    controls.maxPolarAngle = Math.PI; // 允许完全上下旋转
-    controls.minPolarAngle = 0; // 允许从底部查看
     controls.update();
 
     // 光线 - 增强光照效果
@@ -255,6 +232,8 @@
     const dl2 = new THREE.DirectionalLight(0xffffff, 0.4);
     dl2.position.set(-100, -100, -100);
     scene.add(dl2);
+
+    // 注意：移除了地面网格
 
     // LDraw Loader - 使用打包后的MPD文件，不需要零件库路径
     const loader = new LDrawLoader();
@@ -270,12 +249,7 @@
     let currentModelCenter = new THREE.Vector3(); // 当前模型的中心点
     let verifiedSteps = new Set(); // 存储已验证通过的步骤路径
     let totalSteps = 0; // 总步骤数（不包含_00文件）
-    let isRotating = false; // 是否正在自动旋转
-    let rotationSpeed = 0.005; // 旋转速度
-    let initialModelRotation = new THREE.Quaternion(); // 存储模型的初始旋转状态
-    let initialCameraStates = {}; // 存储每个模型的初始视角状态，使用文件路径作为键
-    let modelRotationStates = {}; // 新增：存储每个模型的旋转状态
-
+    
     function clearCurrent() {
       if (!currentGroup) return;
       scene.remove(currentGroup);
@@ -287,7 +261,6 @@
         }
       });
       currentGroup = null;
-      // 注意：不再重置initialCameraStates和modelRotationStates，因为我们需要保留所有模型的初始状态
     }
 
     const statusTextEl = document.getElementById("status-text");
@@ -300,8 +273,7 @@
       stepCameraStates[stepPath] = {
         position: camera.position.clone(),
         target: controls.target.clone(),
-        zoom: camera.zoom,
-        modelRotation: currentGroup ? currentGroup.quaternion.clone() : new THREE.Quaternion()
+        zoom: camera.zoom
       };
     }
 
@@ -313,12 +285,6 @@
         controls.target.copy(state.target);
         camera.zoom = state.zoom;
         camera.updateProjectionMatrix();
-        
-        // 恢复模型旋转状态
-        if (currentGroup && state.modelRotation) {
-          currentGroup.quaternion.copy(state.modelRotation);
-        }
-        
         controls.update();
         return true;
       }
@@ -330,18 +296,6 @@
       const box = new THREE.Box3().setFromObject(group);
       const center = box.getCenter(new THREE.Vector3());
       return center;
-    }
-
-    // 停止旋转
-    function stopRotation() {
-      if (isRotating) {
-        isRotating = false;
-        const rotateBtn = document.getElementById('rotateModelBtn');
-        rotateBtn.classList.remove('active');
-        if (currentGroup) {
-          setStatus("旋转已停止");
-        }
-      }
     }
 
     function loadModelByUrl(url, isStepNavigation = false, stepPath = null) {
@@ -375,31 +329,6 @@
           // 计算当前模型的中心点
           currentModelCenter = computeModelCenter(group);
           
-          // 保存模型的初始旋转状态
-          initialModelRotation.copy(group.quaternion);
-          
-          // 保存初始视角状态（仅第一次加载该模型时）
-          if (!initialCameraStates[url] && !isStepNavigation) {
-            // 先适应视角
-            fitCameraToObject(group);
-            
-            // 然后保存初始视角状态
-            initialCameraStates[url] = {
-              position: camera.position.clone(),
-              target: controls.target.clone(),
-              zoom: camera.zoom,
-              modelRotation: group.quaternion.clone()
-            };
-          }
-          
-          // 初始化模型的旋转状态
-          if (!modelRotationStates[url]) {
-            modelRotationStates[url] = {
-              isRotating: false,
-              rotationY: 0
-            };
-          }
-          
           // 如果是步骤导航，尝试恢复保存的相机状态
           if (isStepNavigation && stepPath) {
             const hasSavedState = restoreCameraState(stepPath);
@@ -409,45 +338,12 @@
               saveCameraState(stepPath);
             }
           } else {
-            // 不是步骤导航，如果有初始视角状态则恢复，否则适应视角
-            if (initialCameraStates[url]) {
-              // 恢复初始视角状态
-              const state = initialCameraStates[url];
-              camera.position.copy(state.position);
-              controls.target.copy(state.target);
-              camera.zoom = state.zoom;
-              camera.updateProjectionMatrix();
-              
-              // 恢复模型初始旋转
-              group.quaternion.copy(state.modelRotation);
-              
-              controls.update();
-            } else {
-              // 适应视角
-              fitCameraToObject(group);
-            }
+            // 不是步骤导航，使用适应视角
+            fitCameraToObject(group);
             
             // 如果是基础模型，保存初始状态
             if (stepPath) {
               saveCameraState(stepPath);
-            }
-          }
-          
-          // 恢复模型的旋转状态
-          if (modelRotationStates[url]) {
-            const rotationState = modelRotationStates[url];
-            group.rotation.y = rotationState.rotationY;
-            
-            // 恢复旋转状态
-            if (rotationState.isRotating) {
-              isRotating = true;
-              const rotateBtn = document.getElementById('rotateModelBtn');
-              rotateBtn.classList.add('active');
-              setStatus("自动旋转中...");
-            } else {
-              isRotating = false;
-              const rotateBtn = document.getElementById('rotateModelBtn');
-              rotateBtn.classList.remove('active');
             }
           }
           
@@ -473,93 +369,13 @@
       const center = box.getCenter(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
+      // 修改：将系数从1.8改为0.9
       let cameraZ = Math.abs(maxDim / 2 * 0.9 / Math.tan(fov / 2));
       if (!isFinite(cameraZ) || cameraZ <= 0) cameraZ = 300;
       camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
       camera.lookAt(center);
       controls.target.copy(center);
       controls.update();
-    }
-
-    // 视野自适应按钮功能
-    function resetView() {
-      if (currentGroup) {
-        stopRotation();
-        
-        // 获取当前模型的URL
-        let currentModelUrl = '';
-        if (currentStepIndex >= 0 && stepFiles[currentStepIndex]) {
-          currentModelUrl = stepFiles[currentStepIndex].path;
-        } else {
-          const categorySel = document.getElementById("categorySelect");
-          const modelSel = document.getElementById("modelSelect");
-          if (categorySel.value && modelSel.value) {
-            currentModelUrl = `models/${categorySel.value}/${modelSel.value}`;
-          }
-        }
-        
-        // 如果有该模型的初始视角状态，则恢复
-        if (currentModelUrl && initialCameraStates[currentModelUrl]) {
-          const state = initialCameraStates[currentModelUrl];
-          camera.position.copy(state.position);
-          controls.target.copy(state.target);
-          camera.zoom = state.zoom;
-          camera.updateProjectionMatrix();
-          
-          // 恢复模型初始旋转
-          currentGroup.quaternion.copy(state.modelRotation);
-          
-          // 重置Y轴旋转
-          currentGroup.rotation.y = 0;
-          
-          // 更新旋转状态
-          if (modelRotationStates[currentModelUrl]) {
-            modelRotationStates[currentModelUrl].rotationY = 0;
-            modelRotationStates[currentModelUrl].isRotating = false;
-          }
-          
-          controls.update();
-        } else {
-          // 否则使用适应视角
-          fitCameraToObject(currentGroup);
-        }
-      }
-    }
-
-    // 切换旋转状态
-    function toggleRotation() {
-      // 获取当前模型的URL
-      let currentModelUrl = '';
-      if (currentStepIndex >= 0 && stepFiles[currentStepIndex]) {
-        currentModelUrl = stepFiles[currentStepIndex].path;
-      } else {
-        const categorySel = document.getElementById("categorySelect");
-        const modelSel = document.getElementById("modelSelect");
-        if (categorySel.value && modelSel.value) {
-          currentModelUrl = `models/${categorySel.value}/${modelSel.value}`;
-        }
-      }
-      
-      if (isRotating) {
-        stopRotation();
-        
-        // 保存当前旋转状态
-        if (currentModelUrl && modelRotationStates[currentModelUrl]) {
-          modelRotationStates[currentModelUrl].isRotating = false;
-          modelRotationStates[currentModelUrl].rotationY = currentGroup ? currentGroup.rotation.y : 0;
-        }
-      } else {
-        isRotating = true;
-        const rotateBtn = document.getElementById('rotateModelBtn');
-        rotateBtn.classList.add('active');
-        
-        // 保存当前旋转状态
-        if (currentModelUrl && modelRotationStates[currentModelUrl]) {
-          modelRotationStates[currentModelUrl].isRotating = true;
-        }
-        
-        setStatus("自动旋转中...");
-      }
     }
 
     // 更新模型下拉菜单
@@ -810,9 +626,6 @@
     function goToStep(stepIndex) {
       if (stepIndex < 0 || stepIndex >= stepFiles.length) return;
       
-      // 停止旋转（如果正在旋转）
-      stopRotation();
-      
       const stepFile = stepFiles[stepIndex];
       
       // 检查是否为需要密码的步骤（_00文件）且尚未验证
@@ -874,62 +687,20 @@
 
     function animate(){ 
       requestAnimationFrame(animate); 
-      
-      // 如果正在自动旋转，绕Y轴旋转模型
-      if (isRotating && currentGroup) {
-        currentGroup.rotation.y += rotationSpeed;
-        
-        // 保存当前旋转状态
-        const currentModelUrl = getCurrentModelUrl();
-        if (currentModelUrl && modelRotationStates[currentModelUrl]) {
-          modelRotationStates[currentModelUrl].rotationY = currentGroup.rotation.y;
-        }
-      }
-      
-      // 更新 controls（启用阻尼时需要）
-      controls.update();
+      renderer.render(scene, camera); 
       
       // 如果不是正在切换步骤，并且有当前步骤，则自动保存相机状态
       if (!isSwitchingStep && currentStepIndex >= 0 && stepFiles[currentStepIndex]) {
         const currentStepFile = stepFiles[currentStepIndex];
         saveCameraState(currentStepFile.path);
       }
-      
-      renderer.render(scene, camera); 
     }
     animate();
-
-    // 获取当前模型URL的辅助函数
-    function getCurrentModelUrl() {
-      if (currentStepIndex >= 0 && stepFiles[currentStepIndex]) {
-        return stepFiles[currentStepIndex].path;
-      } else {
-        const categorySel = document.getElementById("categorySelect");
-        const modelSel = document.getElementById("modelSelect");
-        if (categorySel.value && modelSel.value) {
-          return `models/${categorySel.value}/${modelSel.value}`;
-        }
-      }
-      return null;
-    }
 
     window.addEventListener("resize", ()=>{
       camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(innerWidth, innerHeight);
-    });
-
-    // 视野自适应按钮事件
-    document.getElementById("resetViewBtn").addEventListener("click", resetView);
-    
-    // 旋转模型按钮事件
-    document.getElementById("rotateModelBtn").addEventListener("click", toggleRotation);
-
-    // 当用户开始交互时停止自动旋转
-    controls.addEventListener('start', () => {
-      if (isRotating) {
-        toggleRotation();
-      }
     });
 
     document.getElementById("loadBtn").addEventListener("click", ()=>{
@@ -950,6 +721,17 @@
       
       // 检测步骤文件
       detectStepFiles(categorySel.value, modelSel.value);
+    });
+
+    document.getElementById("fitBtn").addEventListener("click", ()=>{
+      if (currentGroup) {
+        fitCameraToObject(currentGroup);
+        // 如果是步骤导航中的模型，保存新的自适应视角
+        if (currentStepIndex >= 0) {
+          const currentStepFile = stepFiles[currentStepIndex];
+          saveCameraState(currentStepFile.path);
+        }
+      }
     });
 
     // 修复全屏按钮
