@@ -273,7 +273,7 @@
     let isRotating = false; // 是否正在自动旋转
     let rotationSpeed = 0.005; // 旋转速度
     let initialModelRotation = new THREE.Quaternion(); // 存储模型的初始旋转状态
-    let initialCameraState = null; // 存储初始视角状态
+    let initialCameraStates = {}; // 修改：存储每个模型的初始视角状态，使用文件路径作为键
 
     function clearCurrent() {
       if (!currentGroup) return;
@@ -286,7 +286,7 @@
         }
       });
       currentGroup = null;
-      initialCameraState = null; // 重置初始视角状态
+      // 注意：不再重置initialCameraStates，因为我们需要保留所有模型的初始视角
     }
 
     const statusTextEl = document.getElementById("status-text");
@@ -377,9 +377,13 @@
           // 保存模型的初始旋转状态
           initialModelRotation.copy(group.quaternion);
           
-          // 保存初始视角状态（仅第一次加载时）
-          if (!initialCameraState && !isStepNavigation) {
-            initialCameraState = {
+          // 保存初始视角状态（仅第一次加载该模型时）
+          if (!initialCameraStates[url] && !isStepNavigation) {
+            // 先适应视角
+            fitCameraToObject(group);
+            
+            // 然后保存初始视角状态
+            initialCameraStates[url] = {
               position: camera.position.clone(),
               target: controls.target.clone(),
               zoom: camera.zoom,
@@ -396,8 +400,23 @@
               saveCameraState(stepPath);
             }
           } else {
-            // 不是步骤导航，使用适应视角
-            fitCameraToObject(group);
+            // 不是步骤导航，如果有初始视角状态则恢复，否则适应视角
+            if (initialCameraStates[url]) {
+              // 恢复初始视角状态
+              const state = initialCameraStates[url];
+              camera.position.copy(state.position);
+              controls.target.copy(state.target);
+              camera.zoom = state.zoom;
+              camera.updateProjectionMatrix();
+              
+              // 恢复模型初始旋转
+              group.quaternion.copy(state.modelRotation);
+              
+              controls.update();
+            } else {
+              // 适应视角
+              fitCameraToObject(group);
+            }
             
             // 如果是基础模型，保存初始状态
             if (stepPath) {
@@ -437,19 +456,37 @@
 
     // 视野自适应按钮功能
     function resetView() {
-      if (currentGroup && initialCameraState) {
+      if (currentGroup) {
         stopRotation();
         
-        // 恢复初始视角
-        camera.position.copy(initialCameraState.position);
-        controls.target.copy(initialCameraState.target);
-        camera.zoom = initialCameraState.zoom;
-        camera.updateProjectionMatrix();
+        // 获取当前模型的URL
+        let currentModelUrl = '';
+        if (currentStepIndex >= 0 && stepFiles[currentStepIndex]) {
+          currentModelUrl = stepFiles[currentStepIndex].path;
+        } else {
+          const categorySel = document.getElementById("categorySelect");
+          const modelSel = document.getElementById("modelSelect");
+          if (categorySel.value && modelSel.value) {
+            currentModelUrl = `models/${categorySel.value}/${modelSel.value}`;
+          }
+        }
         
-        // 恢复模型初始旋转
-        currentGroup.quaternion.copy(initialCameraState.modelRotation);
-        
-        controls.update();
+        // 如果有该模型的初始视角状态，则恢复
+        if (currentModelUrl && initialCameraStates[currentModelUrl]) {
+          const state = initialCameraStates[currentModelUrl];
+          camera.position.copy(state.position);
+          controls.target.copy(state.target);
+          camera.zoom = state.zoom;
+          camera.updateProjectionMatrix();
+          
+          // 恢复模型初始旋转
+          currentGroup.quaternion.copy(state.modelRotation);
+          
+          controls.update();
+        } else {
+          // 否则使用适应视角
+          fitCameraToObject(currentGroup);
+        }
       }
     }
 
