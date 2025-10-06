@@ -101,6 +101,22 @@
     .load-copy-group button {
       flex: 1;
     }
+    /* 视角调整板块样式 */
+    #view-controls {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e0e0e0;
+    }
+    .view-controls-row {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 6px;
+    }
+    .view-controls-row button {
+      flex: 1;
+      font-size: 12px;
+      padding: 6px 4px;
+    }
     /* 密码弹窗样式 */
     #password-modal {
       display: none;
@@ -138,6 +154,11 @@
     .password-buttons button {
       flex: 1;
     }
+    /* 旋转按钮激活状态 */
+    #rotateBtn.active {
+      background-color: #4CAF50;
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -156,11 +177,24 @@
     <div class="load-copy-group">
       <button id="loadBtn">加载模型</button>
       <button id="copyLinkBtn">复制链接</button>
+      <button id="fullscreenBtn">全屏</button>
     </div>
     
-    <div class="button-group">
-      <button id="fitBtn">视野自适应</button>
-      <button id="fullscreenBtn">全屏</button>
+    <!-- 视角调整板块 -->
+    <div id="view-controls">
+      <div class="section-title">视角调整</div>
+      <div class="view-controls-row">
+        <button id="topViewBtn">上</button>
+        <button id="bottomViewBtn">下</button>
+        <button id="leftViewBtn">左</button>
+        <button id="rightViewBtn">右</button>
+      </div>
+      <div class="view-controls-row">
+        <button id="frontViewBtn">前</button>
+        <button id="backViewBtn">后</button>
+        <button id="defaultViewBtn">默认</button>
+        <button id="rotateBtn">旋转</button>
+      </div>
     </div>
     
     <div id="status">
@@ -249,6 +283,8 @@
     let currentModelCenter = new THREE.Vector3(); // 当前模型的中心点
     let verifiedSteps = new Set(); // 存储已验证通过的步骤路径
     let totalSteps = 0; // 总步骤数（不包含_00文件）
+    let isRotating = false; // 是否正在自动旋转
+    let rotationSpeed = 0.005; // 旋转速度
     
     function clearCurrent() {
       if (!currentGroup) return;
@@ -296,6 +332,18 @@
       const box = new THREE.Box3().setFromObject(group);
       const center = box.getCenter(new THREE.Vector3());
       return center;
+    }
+
+    // 停止旋转
+    function stopRotation() {
+      if (isRotating) {
+        isRotating = false;
+        const rotateBtn = document.getElementById('rotateBtn');
+        rotateBtn.classList.remove('active');
+        if (currentGroup) {
+          setStatus("旋转已停止");
+        }
+      }
     }
 
     function loadModelByUrl(url, isStepNavigation = false, stepPath = null) {
@@ -376,6 +424,68 @@
       camera.lookAt(center);
       controls.target.copy(center);
       controls.update();
+    }
+
+    // 设置标准视图
+    function setStandardView(direction) {
+      if (!currentGroup) return;
+      
+      const box = new THREE.Box3().setFromObject(currentGroup);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const distance = maxDim * 1.5; // 设置合适的距离
+      
+      switch(direction) {
+        case 'top':
+          camera.position.set(center.x, center.y + distance, center.z);
+          camera.up.set(0, 0, -1);
+          break;
+        case 'bottom':
+          camera.position.set(center.x, center.y - distance, center.z);
+          camera.up.set(0, 0, 1);
+          break;
+        case 'left':
+          camera.position.set(center.x - distance, center.y, center.z);
+          camera.up.set(0, 1, 0);
+          break;
+        case 'right':
+          camera.position.set(center.x + distance, center.y, center.z);
+          camera.up.set(0, 1, 0);
+          break;
+        case 'front':
+          camera.position.set(center.x, center.y, center.z + distance);
+          camera.up.set(0, 1, 0);
+          break;
+        case 'back':
+          camera.position.set(center.x, center.y, center.z - distance);
+          camera.up.set(0, 1, 0);
+          break;
+      }
+      
+      camera.lookAt(center);
+      controls.target.copy(center);
+      controls.update();
+      
+      // 保存当前视角状态
+      if (currentStepIndex >= 0) {
+        const currentStepFile = stepFiles[currentStepIndex];
+        saveCameraState(currentStepFile.path);
+      }
+    }
+
+    // 切换旋转状态
+    function toggleRotation() {
+      isRotating = !isRotating;
+      const rotateBtn = document.getElementById('rotateBtn');
+      
+      if (isRotating) {
+        rotateBtn.classList.add('active');
+        setStatus("自动旋转中...");
+      } else {
+        rotateBtn.classList.remove('active');
+        setStatus("旋转已停止");
+      }
     }
 
     // 更新模型下拉菜单
@@ -626,6 +736,9 @@
     function goToStep(stepIndex) {
       if (stepIndex < 0 || stepIndex >= stepFiles.length) return;
       
+      // 停止旋转（如果正在旋转）
+      stopRotation();
+      
       const stepFile = stepFiles[stepIndex];
       
       // 检查是否为需要密码的步骤（_00文件）且尚未验证
@@ -687,13 +800,19 @@
 
     function animate(){ 
       requestAnimationFrame(animate); 
-      renderer.render(scene, camera); 
+      
+      // 如果正在自动旋转，绕Z轴旋转模型
+      if (isRotating && currentGroup) {
+        currentGroup.rotation.z += rotationSpeed;
+      }
       
       // 如果不是正在切换步骤，并且有当前步骤，则自动保存相机状态
       if (!isSwitchingStep && currentStepIndex >= 0 && stepFiles[currentStepIndex]) {
         const currentStepFile = stepFiles[currentStepIndex];
         saveCameraState(currentStepFile.path);
       }
+      
+      renderer.render(scene, camera); 
     }
     animate();
 
@@ -701,6 +820,25 @@
       camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // 视角调整按钮事件
+    document.getElementById("topViewBtn").addEventListener("click", () => setStandardView('top'));
+    document.getElementById("bottomViewBtn").addEventListener("click", () => setStandardView('bottom'));
+    document.getElementById("leftViewBtn").addEventListener("click", () => setStandardView('left'));
+    document.getElementById("rightViewBtn").addEventListener("click", () => setStandardView('right'));
+    document.getElementById("frontViewBtn").addEventListener("click", () => setStandardView('front'));
+    document.getElementById("backViewBtn").addEventListener("click", () => setStandardView('back'));
+    document.getElementById("defaultViewBtn").addEventListener("click", () => {
+      if (currentGroup) fitCameraToObject(currentGroup);
+    });
+    document.getElementById("rotateBtn").addEventListener("click", toggleRotation);
+
+    // 当用户开始交互时停止自动旋转
+    controls.addEventListener('start', () => {
+      if (isRotating) {
+        toggleRotation();
+      }
     });
 
     document.getElementById("loadBtn").addEventListener("click", ()=>{
@@ -721,17 +859,6 @@
       
       // 检测步骤文件
       detectStepFiles(categorySel.value, modelSel.value);
-    });
-
-    document.getElementById("fitBtn").addEventListener("click", ()=>{
-      if (currentGroup) {
-        fitCameraToObject(currentGroup);
-        // 如果是步骤导航中的模型，保存新的自适应视角
-        if (currentStepIndex >= 0) {
-          const currentStepFile = stepFiles[currentStepIndex];
-          saveCameraState(currentStepFile.path);
-        }
-      }
     });
 
     // 修复全屏按钮
