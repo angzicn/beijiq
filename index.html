@@ -273,7 +273,8 @@
     let isRotating = false; // 是否正在自动旋转
     let rotationSpeed = 0.005; // 旋转速度
     let initialModelRotation = new THREE.Quaternion(); // 存储模型的初始旋转状态
-    let initialCameraStates = {}; // 修改：存储每个模型的初始视角状态，使用文件路径作为键
+    let initialCameraStates = {}; // 存储每个模型的初始视角状态，使用文件路径作为键
+    let modelRotationStates = {}; // 新增：存储每个模型的旋转状态
 
     function clearCurrent() {
       if (!currentGroup) return;
@@ -286,7 +287,7 @@
         }
       });
       currentGroup = null;
-      // 注意：不再重置initialCameraStates，因为我们需要保留所有模型的初始视角
+      // 注意：不再重置initialCameraStates和modelRotationStates，因为我们需要保留所有模型的初始状态
     }
 
     const statusTextEl = document.getElementById("status-text");
@@ -391,6 +392,14 @@
             };
           }
           
+          // 初始化模型的旋转状态
+          if (!modelRotationStates[url]) {
+            modelRotationStates[url] = {
+              isRotating: false,
+              rotationY: 0
+            };
+          }
+          
           // 如果是步骤导航，尝试恢复保存的相机状态
           if (isStepNavigation && stepPath) {
             const hasSavedState = restoreCameraState(stepPath);
@@ -421,6 +430,24 @@
             // 如果是基础模型，保存初始状态
             if (stepPath) {
               saveCameraState(stepPath);
+            }
+          }
+          
+          // 恢复模型的旋转状态
+          if (modelRotationStates[url]) {
+            const rotationState = modelRotationStates[url];
+            group.rotation.y = rotationState.rotationY;
+            
+            // 恢复旋转状态
+            if (rotationState.isRotating) {
+              isRotating = true;
+              const rotateBtn = document.getElementById('rotateModelBtn');
+              rotateBtn.classList.add('active');
+              setStatus("自动旋转中...");
+            } else {
+              isRotating = false;
+              const rotateBtn = document.getElementById('rotateModelBtn');
+              rotateBtn.classList.remove('active');
             }
           }
           
@@ -482,6 +509,15 @@
           // 恢复模型初始旋转
           currentGroup.quaternion.copy(state.modelRotation);
           
+          // 重置Y轴旋转
+          currentGroup.rotation.y = 0;
+          
+          // 更新旋转状态
+          if (modelRotationStates[currentModelUrl]) {
+            modelRotationStates[currentModelUrl].rotationY = 0;
+            modelRotationStates[currentModelUrl].isRotating = false;
+          }
+          
           controls.update();
         } else {
           // 否则使用适应视角
@@ -492,13 +528,36 @@
 
     // 切换旋转状态
     function toggleRotation() {
+      // 获取当前模型的URL
+      let currentModelUrl = '';
+      if (currentStepIndex >= 0 && stepFiles[currentStepIndex]) {
+        currentModelUrl = stepFiles[currentStepIndex].path;
+      } else {
+        const categorySel = document.getElementById("categorySelect");
+        const modelSel = document.getElementById("modelSelect");
+        if (categorySel.value && modelSel.value) {
+          currentModelUrl = `models/${categorySel.value}/${modelSel.value}`;
+        }
+      }
+      
       if (isRotating) {
         stopRotation();
-        // 注意：不再恢复初始旋转状态，保持当前旋转角度
+        
+        // 保存当前旋转状态
+        if (currentModelUrl && modelRotationStates[currentModelUrl]) {
+          modelRotationStates[currentModelUrl].isRotating = false;
+          modelRotationStates[currentModelUrl].rotationY = currentGroup ? currentGroup.rotation.y : 0;
+        }
       } else {
         isRotating = true;
         const rotateBtn = document.getElementById('rotateModelBtn');
         rotateBtn.classList.add('active');
+        
+        // 保存当前旋转状态
+        if (currentModelUrl && modelRotationStates[currentModelUrl]) {
+          modelRotationStates[currentModelUrl].isRotating = true;
+        }
+        
         setStatus("自动旋转中...");
       }
     }
@@ -819,6 +878,12 @@
       // 如果正在自动旋转，绕Y轴旋转模型
       if (isRotating && currentGroup) {
         currentGroup.rotation.y += rotationSpeed;
+        
+        // 保存当前旋转状态
+        const currentModelUrl = getCurrentModelUrl();
+        if (currentModelUrl && modelRotationStates[currentModelUrl]) {
+          modelRotationStates[currentModelUrl].rotationY = currentGroup.rotation.y;
+        }
       }
       
       // 更新 controls（启用阻尼时需要）
@@ -833,6 +898,20 @@
       renderer.render(scene, camera); 
     }
     animate();
+
+    // 获取当前模型URL的辅助函数
+    function getCurrentModelUrl() {
+      if (currentStepIndex >= 0 && stepFiles[currentStepIndex]) {
+        return stepFiles[currentStepIndex].path;
+      } else {
+        const categorySel = document.getElementById("categorySelect");
+        const modelSel = document.getElementById("modelSelect");
+        if (categorySel.value && modelSel.value) {
+          return `models/${categorySel.value}/${modelSel.value}`;
+        }
+      }
+      return null;
+    }
 
     window.addEventListener("resize", ()=>{
       camera.aspect = innerWidth / innerHeight;
