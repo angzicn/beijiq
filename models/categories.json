@@ -7,6 +7,7 @@
     {"file": "05Collect.mpd", "name": "05_Collect"}
   ],
   "SPIKE PYTHON": [
-    {"file": "fan.mpd", "name": "04_PutOutFire"}
+    {"file": "fan.mpd", "name": "04_PutOutFire"},
+    {"file": "05cupstacking.ldr_Packed.mpd", "name": "05_CupStacking"}
   ]
 }
