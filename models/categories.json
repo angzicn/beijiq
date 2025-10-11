@@ -5,7 +5,7 @@
   "SPIKE STEM": [
     {"file": "CarrySomething.mpd", "name": "04_Carry"},
     {"file": "05Collect.mpd", "name": "05_Collect"},
-    {"file": "06claw.mpd", "name": "06_Claw"}
+    {"file": "06claw.mpd", "name": "06_Distance"}
   ],
   "SPIKE PYTHON": [
     {"file": "fan.mpd", "name": "04_PutOutFire"},
