@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -160,6 +159,27 @@
     #description-content p {
       margin: 4px 0;
     }
+    /* 更新日志样式 */
+    #changelog {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e0e0e0;
+      display: none; /* 默认隐藏 */
+    }
+    #changelog-content {
+      max-height: 150px;
+      overflow-y: auto;
+      font-size: 13px;
+      line-height: 1.4;
+      color: #333;
+      background: #f8f8f8;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+    }
+    #changelog-content p {
+      margin: 4px 0;
+    }
   </style>
 </head>
 <body>
@@ -171,7 +191,7 @@
         <option>正在加载分类…</option>
       </select>
       <select id="modelSelect">
-        <option>请先选择分类</option>
+        <option>--请选择模型--</option>
       </select>
     </div>
     
@@ -206,6 +226,12 @@
     <div id="step-description">
       <div class="section-title">步骤说明</div>
       <div id="description-content"></div>
+    </div>
+    
+    <!-- 更新日志 -->
+    <div id="changelog">
+      <div class="section-title">更新日志</div>
+      <div id="changelog-content"></div>
     </div>
   </div>
 
@@ -291,6 +317,7 @@
     let currentModelCenter = new THREE.Vector3(); // 当前模型的中心点
     let verifiedSteps = new Set(); // 存储已验证通过的步骤路径
     let totalSteps = 0; // 总步骤数（不包含_00文件）
+    let isDefaultModelLoaded = false; // 标记是否已加载默认模型
     
     // 修复2: 添加标记，记录哪些步骤已经初始化过视角
     let initializedSteps = new Set();
@@ -379,11 +406,52 @@
       }
     }
 
-    function loadModelByUrl(url, isStepNavigation = false, stepPath = null) {
+    // 加载并显示更新日志
+    async function loadChangelog() {
+      const changelogContainer = document.getElementById('changelog');
+      const contentElement = document.getElementById('changelog-content');
+      
+      try {
+        // 尝试加载日志文件
+        const response = await fetch('log.txt');
+        if (response.ok) {
+          const textContent = await response.text();
+          
+          // 显示文本内容，保留换行和格式
+          contentElement.innerHTML = textContent.replace(/\n/g, '<br>');
+          changelogContainer.style.display = 'block';
+          
+          console.log('更新日志加载成功');
+        } else {
+          // 日志文件不存在，隐藏日志区域
+          changelogContainer.style.display = 'none';
+        }
+      } catch (error) {
+        // 加载失败，隐藏日志区域
+        changelogContainer.style.display = 'none';
+        console.log('未找到更新日志文件');
+      }
+    }
+
+    // 隐藏更新日志
+    function hideChangelog() {
+      const changelogContainer = document.getElementById('changelog');
+      changelogContainer.style.display = 'none';
+    }
+
+    function loadModelByUrl(url, isStepNavigation = false, stepPath = null, isDefaultModel = false) {
       const loadId = ++currentLoadId;
       
       setStatus("加载中...");
       clearCurrent();
+      
+      // 如果不是默认模型，隐藏更新日志
+      if (!isDefaultModel) {
+        hideChangelog();
+        isDefaultModelLoaded = false;
+      } else {
+        isDefaultModelLoaded = true;
+      }
       
       loader.load(url, 
         group => {
@@ -467,8 +535,10 @@
           
           setStatus("加载完成");
           
-          // 加载步骤说明文本
-          loadStepDescription(url);
+          // 如果不是默认模型，加载步骤说明文本
+          if (!isDefaultModel) {
+            loadStepDescription(url);
+          }
         }, 
         undefined, 
         err => {
@@ -509,12 +579,18 @@
       const modelSelect = document.getElementById("modelSelect");
       
       if (!categoriesData || !categoriesData[category]) {
-        modelSelect.innerHTML = "<option>该分类下无模型</option>";
+        modelSelect.innerHTML = "<option>--请选择模型--</option>";
         return;
       }
       
       const models = categoriesData[category];
       modelSelect.innerHTML = "";
+      
+      // 添加默认选项
+      const defaultOption = document.createElement("option");
+      defaultOption.textContent = "--请选择模型--";
+      defaultOption.value = "";
+      modelSelect.appendChild(defaultOption);
       
       models.forEach(model => {
         const option = document.createElement("option");
@@ -535,11 +611,6 @@
           loadModelByUrl(modelPath);
           return;
         }
-      }
-      
-      // 否则自动选择第一个模型
-      if (models.length > 0) {
-        modelSelect.selectedIndex = 0;
       }
     }
 
@@ -954,24 +1025,14 @@
             detectStepFiles(urlCategory, urlModel);
           }
         } 
-        // 否则自动选择第一个分类
+        // 否则不自动选择任何分类，并加载默认模型
         else if (Object.keys(categoriesData).length > 0) {
-          categorySel.selectedIndex = 1;
-          updateModelSelect(categorySel.value);
-          
-          // 自动加载第一个分类的第一个模型
+          // 不自动选择第一个分类，保持默认提示
+          // 加载默认模型
           setTimeout(() => {
-            const modelSel = document.getElementById("modelSelect");
-            if (modelSel.value) {
-              // 设置当前基础模型文件
-              currentBaseModelFile = modelSel.value;
-              
-              const modelPath = `models/${categorySel.value}/${modelSel.value}`;
-              loadModelByUrl(modelPath);
-              
-              // 检测步骤文件
-              detectStepFiles(categorySel.value, modelSel.value);
-            }
+            loadModelByUrl('beijiq.mpd', false, null, true);
+            // 加载更新日志
+            loadChangelog();
           }, 100);
         }
       } catch (err) {
