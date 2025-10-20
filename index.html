@@ -407,15 +407,25 @@
           controls.target.copy(currentModelCenter);
           controls.update();
           
-          // 修复2: 简化的视角处理逻辑
-          // 如果这是步骤导航，尝试恢复保存的相机状态
+          // 修复3: 重新设计的视角处理逻辑
+          // 如果是步骤导航，尝试恢复保存的相机状态
           if (isStepNavigation && stepPath) {
-            const hasSavedState = restoreCameraState(stepPath);
-            if (!hasSavedState) {
-              // 如果没有保存的状态，使用适应视角并保存
+            // 检查这个步骤是否已经初始化过
+            if (!initializedSteps.has(stepPath)) {
+              // 第一次切换到这个步骤，使用视野自适应并标记为已初始化
               fitCameraToObject(group);
               saveCameraState(stepPath);
               initializedSteps.add(stepPath);
+              console.log('首次切换到步骤，使用视野自适应:', stepPath);
+            } else {
+              // 不是第一次，尝试恢复保存的相机状态
+              const hasSavedState = restoreCameraState(stepPath);
+              if (!hasSavedState) {
+                // 如果没有保存的状态，使用适应视角并保存
+                fitCameraToObject(group);
+                saveCameraState(stepPath);
+                initializedSteps.add(stepPath);
+              }
             }
           } else {
             // 不是步骤导航，检查是否是第一次加载这个模型
