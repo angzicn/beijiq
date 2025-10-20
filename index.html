@@ -259,8 +259,8 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0,0,0);
     
-    // 重新启用平移，但确保旋转中心正确
-    controls.enablePan = true;
+    // 修复1: 禁用平移，只能旋转和缩放
+    controls.enablePan = false;
     
     controls.update();
 
@@ -290,6 +290,9 @@
     let currentModelCenter = new THREE.Vector3(); // 当前模型的中心点
     let verifiedSteps = new Set(); // 存储已验证通过的步骤路径
     let totalSteps = 0; // 总步骤数（不包含_00文件）
+    
+    // 修复2: 添加标记，记录哪些步骤已经初始化过视角
+    let initializedSteps = new Set();
     
     function clearCurrent() {
       if (!currentGroup) return;
@@ -404,17 +407,21 @@
           controls.target.copy(currentModelCenter);
           controls.update();
           
-          // 如果是步骤导航，尝试恢复保存的相机状态
-          if (isStepNavigation && stepPath) {
+          // 修复2: 如果是第一次加载这个步骤，使用视野自适应
+          if (stepPath && !initializedSteps.has(stepPath)) {
+            // 第一次加载这个步骤，使用视野自适应
+            fitCameraToObject(group);
+            saveCameraState(stepPath);
+            initializedSteps.add(stepPath);
+            console.log('首次加载步骤，使用视野自适应:', stepPath);
+          } else if (isStepNavigation && stepPath) {
+            // 不是第一次加载，尝试恢复保存的相机状态
             const hasSavedState = restoreCameraState(stepPath);
             if (!hasSavedState) {
               // 如果没有保存的状态，使用适应视角并保存
               fitCameraToObject(group);
               saveCameraState(stepPath);
-            } else {
-              // 即使恢复了相机状态，也要确保目标点正确设置为当前模型中心
-              controls.target.copy(currentModelCenter);
-              controls.update();
+              initializedSteps.add(stepPath);
             }
           } else {
             // 不是步骤导航，使用适应视角
@@ -423,6 +430,7 @@
             // 如果是基础模型，保存初始状态
             if (stepPath) {
               saveCameraState(stepPath);
+              initializedSteps.add(stepPath);
             }
           }
           
@@ -861,6 +869,8 @@
       stepCameraStates = {};
       // 清空已验证步骤
       verifiedSteps.clear();
+      // 清空已初始化步骤
+      initializedSteps.clear();
     });
 
     // 获取URL参数
@@ -947,4 +957,3 @@
   </script>
 </body>
 </html>
-
