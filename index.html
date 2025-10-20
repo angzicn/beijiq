@@ -342,6 +342,12 @@
       return center;
     }
 
+    // 检查是否是分布模型（带有_00, _01等后缀）
+    function isDistributionModel(filePath) {
+      const fileName = filePath.split('/').pop();
+      return /_\d+\.mpd$/.test(fileName);
+    }
+
     // 加载并显示步骤说明文本
     async function loadStepDescription(modelPath) {
       const descriptionContainer = document.getElementById('step-description');
@@ -408,17 +414,28 @@
           controls.update();
           
           // 修复3: 重新设计的视角处理逻辑
-          // 如果是步骤导航，尝试恢复保存的相机状态
+          // 如果是步骤导航，检查是否是分布模型
           if (isStepNavigation && stepPath) {
-            // 检查这个步骤是否已经初始化过
-            if (!initializedSteps.has(stepPath)) {
-              // 第一次切换到这个步骤，使用视野自适应并标记为已初始化
-              fitCameraToObject(group);
-              saveCameraState(stepPath);
-              initializedSteps.add(stepPath);
-              console.log('首次切换到步骤，使用视野自适应:', stepPath);
+            // 检查是否是分布模型
+            if (isDistributionModel(stepPath)) {
+              // 分布模型：如果是第一次切换，使用视野自适应
+              if (!initializedSteps.has(stepPath)) {
+                fitCameraToObject(group);
+                saveCameraState(stepPath);
+                initializedSteps.add(stepPath);
+                console.log('首次切换到分布模型，使用视野自适应:', stepPath);
+              } else {
+                // 不是第一次，恢复保存的相机状态
+                const hasSavedState = restoreCameraState(stepPath);
+                if (!hasSavedState) {
+                  // 如果没有保存的状态，使用适应视角并保存
+                  fitCameraToObject(group);
+                  saveCameraState(stepPath);
+                  initializedSteps.add(stepPath);
+                }
+              }
             } else {
-              // 不是第一次，尝试恢复保存的相机状态
+              // 默认模型：直接恢复保存的相机状态，不运行视野自适应
               const hasSavedState = restoreCameraState(stepPath);
               if (!hasSavedState) {
                 // 如果没有保存的状态，使用适应视角并保存
