@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -532,6 +533,12 @@
           // 关键修复：确保控制器目标始终设置为当前模型的几何中心
           controls.target.copy(currentModelCenter);
           controls.update();
+          
+          // 新增：如果是默认模型，使用更小的缩放比例
+          if (isDefaultModel) {
+            camera.zoom = 0.5; // 调整为更小的值，使模型显示更小
+            camera.updateProjectionMatrix();
+          }
           
           setStatus("加载完成");
           
