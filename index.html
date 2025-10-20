@@ -372,7 +372,7 @@
       }
     }
 
-    function loadModelByUrl(url, isStepNavigation = false, stepPath = null, isInitialLoad = false) {
+    function loadModelByUrl(url, isStepNavigation = false, stepPath = null) {
       const loadId = ++currentLoadId;
       
       setStatus("加载中...");
@@ -407,16 +407,9 @@
           controls.target.copy(currentModelCenter);
           controls.update();
           
-          // 修复2: 如果是第一次加载这个步骤，使用视野自适应
-          // 但如果是初始加载的默认模型，我们不将其视为"第一次"，而是直接使用视野自适应并保存状态
-          if (stepPath && !initializedSteps.has(stepPath) && !isInitialLoad) {
-            // 第一次加载这个步骤，使用视野自适应
-            fitCameraToObject(group);
-            saveCameraState(stepPath);
-            initializedSteps.add(stepPath);
-            console.log('首次加载步骤，使用视野自适应:', stepPath);
-          } else if (isStepNavigation && stepPath) {
-            // 不是第一次加载，尝试恢复保存的相机状态
+          // 修复2: 简化的视角处理逻辑
+          // 如果这是步骤导航，尝试恢复保存的相机状态
+          if (isStepNavigation && stepPath) {
             const hasSavedState = restoreCameraState(stepPath);
             if (!hasSavedState) {
               // 如果没有保存的状态，使用适应视角并保存
@@ -425,15 +418,19 @@
               initializedSteps.add(stepPath);
             }
           } else {
-            // 不是步骤导航，使用适应视角
-            fitCameraToObject(group);
-            
-            // 如果是基础模型，保存初始状态
-            if (stepPath) {
+            // 不是步骤导航，检查是否是第一次加载这个模型
+            if (stepPath && !initializedSteps.has(stepPath)) {
+              // 第一次加载这个模型，使用适应视角并标记为已初始化
+              fitCameraToObject(group);
               saveCameraState(stepPath);
-              // 重要修复：如果是初始加载的默认模型，我们将其标记为已初始化
-              // 这样当用户切换走再切换回来时，会恢复保存的状态而不是再次自适应
-              if (isInitialLoad) {
+              initializedSteps.add(stepPath);
+            } else {
+              // 不是第一次加载，尝试恢复保存的相机状态
+              const hasSavedState = restoreCameraState(stepPath);
+              if (!hasSavedState) {
+                // 如果没有保存的状态，使用适应视角并保存
+                fitCameraToObject(group);
+                saveCameraState(stepPath);
                 initializedSteps.add(stepPath);
               }
             }
@@ -506,7 +503,7 @@
           currentBaseModelFile = autoLoadModel;
           // 自动加载指定模型
           const modelPath = `models/${category}/${autoLoadModel}`;
-          loadModelByUrl(modelPath, false, modelPath, true); // 标记为初始加载
+          loadModelByUrl(modelPath);
           return;
         }
       }
@@ -703,7 +700,7 @@
       isSwitchingStep = true;
       
       // 保存当前步骤的相机状态
-      if (currentStepIndex >= 0) {
+      if (currentStepIndex >= 0 && stepFiles[currentStepIndex]) {
         const currentStepFile = stepFiles[currentStepIndex];
         saveCameraState(currentStepFile.path);
       }
@@ -832,7 +829,7 @@
       if (currentGroup) {
         fitCameraToObject(currentGroup);
         // 如果是步骤导航中的模型，保存新的自适应视角
-        if (currentStepIndex >= 0) {
+        if (currentStepIndex >= 0 && stepFiles[currentStepIndex]) {
           const currentStepFile = stepFiles[currentStepIndex];
           saveCameraState(currentStepFile.path);
         }
@@ -941,7 +938,7 @@
               currentBaseModelFile = modelSel.value;
               
               const modelPath = `models/${categorySel.value}/${modelSel.value}`;
-              loadModelByUrl(modelPath, false, modelPath, true); // 标记为初始加载
+              loadModelByUrl(modelPath);
               
               // 检测步骤文件
               detectStepFiles(categorySel.value, modelSel.value);
