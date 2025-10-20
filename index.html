@@ -182,6 +182,7 @@
     <div class="button-group">
       <button id="fitBtn">视野自适应</button>
       <button id="fullscreenBtn">全屏</button>
+      <button id="resetViewBtn">重置视角</button>
     </div>
     
     <div id="status">
@@ -259,8 +260,8 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0,0,0);
     
-    // 修复1: 禁止模型平移，只能旋转和缩放
-    controls.enablePan = false;
+    // 重新启用平移，但确保旋转中心正确
+    controls.enablePan = true;
     
     controls.update();
 
@@ -290,9 +291,6 @@
     let currentModelCenter = new THREE.Vector3(); // 当前模型的中心点
     let verifiedSteps = new Set(); // 存储已验证通过的步骤路径
     let totalSteps = 0; // 总步骤数（不包含_00文件）
-    
-    // 修复2: 添加初始相机状态存储
-    let initialCameraState = null;
     
     function clearCurrent() {
       if (!currentGroup) return;
@@ -402,6 +400,10 @@
           // 计算当前模型的中心点
           currentModelCenter = computeModelCenter(group);
           
+          // 关键修复：无论是否步骤导航，都重置控制器的目标到模型中心
+          controls.target.copy(currentModelCenter);
+          controls.update();
+          
           // 如果是步骤导航，尝试恢复保存的相机状态
           if (isStepNavigation && stepPath) {
             const hasSavedState = restoreCameraState(stepPath);
@@ -417,15 +419,6 @@
             // 如果是基础模型，保存初始状态
             if (stepPath) {
               saveCameraState(stepPath);
-            }
-            
-            // 修复2: 保存初始相机状态
-            if (!initialCameraState) {
-              initialCameraState = {
-                position: camera.position.clone(),
-                target: controls.target.clone(),
-                zoom: camera.zoom
-              };
             }
           }
           
@@ -463,8 +456,21 @@
       camera.lookAt(center);
       camera.updateProjectionMatrix();
       
+      // 确保控制器目标设置为模型中心
       controls.target.copy(center);
       controls.update();
+    }
+
+    // 重置视角函数
+    function resetView() {
+      if (currentGroup) {
+        fitCameraToObject(currentGroup);
+        // 如果是步骤导航中的模型，保存新的自适应视角
+        if (currentStepIndex >= 0) {
+          const currentStepFile = stepFiles[currentStepIndex];
+          saveCameraState(currentStepFile.path);
+        }
+      }
     }
 
     // 更新模型下拉菜单
@@ -828,6 +834,9 @@
       }
     });
 
+    // 重置视角按钮
+    document.getElementById("resetViewBtn").addEventListener("click", resetView);
+
     // 修复全屏按钮
     document.getElementById("fullscreenBtn").addEventListener("click", async ()=>{
       if (!document.fullscreenElement) {
@@ -863,8 +872,6 @@
       stepCameraStates = {};
       // 清空已验证步骤
       verifiedSteps.clear();
-      // 重置初始相机状态
-      initialCameraState = null;
     });
 
     // 获取URL参数
@@ -951,3 +958,4 @@
   </script>
 </body>
 </html>
+
