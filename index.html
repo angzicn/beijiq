@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -405,11 +406,8 @@
             }
           });
           
-          // 计算当前模型的中心点
+          // 关键修复：强制计算当前模型的中心点并设置控制器目标
           currentModelCenter = computeModelCenter(group);
-          
-          // 关键修复：无论是否步骤导航，都重置控制器的目标到模型中心
-          // 这确保了每个模型的旋转中心都是自己的几何中心
           controls.target.copy(currentModelCenter);
           controls.update();
           
@@ -462,6 +460,10 @@
               }
             }
           }
+          
+          // 关键修复：确保控制器目标始终设置为当前模型的几何中心
+          controls.target.copy(currentModelCenter);
+          controls.update();
           
           setStatus("加载完成");
           
