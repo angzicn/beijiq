@@ -372,7 +372,7 @@
       }
     }
 
-    function loadModelByUrl(url, isStepNavigation = false, stepPath = null) {
+    function loadModelByUrl(url, isStepNavigation = false, stepPath = null, isInitialLoad = false) {
       const loadId = ++currentLoadId;
       
       setStatus("加载中...");
@@ -408,7 +408,8 @@
           controls.update();
           
           // 修复2: 如果是第一次加载这个步骤，使用视野自适应
-          if (stepPath && !initializedSteps.has(stepPath)) {
+          // 但如果是初始加载的默认模型，我们不将其视为"第一次"，而是直接使用视野自适应并保存状态
+          if (stepPath && !initializedSteps.has(stepPath) && !isInitialLoad) {
             // 第一次加载这个步骤，使用视野自适应
             fitCameraToObject(group);
             saveCameraState(stepPath);
@@ -430,7 +431,11 @@
             // 如果是基础模型，保存初始状态
             if (stepPath) {
               saveCameraState(stepPath);
-              initializedSteps.add(stepPath);
+              // 重要修复：如果是初始加载的默认模型，我们将其标记为已初始化
+              // 这样当用户切换走再切换回来时，会恢复保存的状态而不是再次自适应
+              if (isInitialLoad) {
+                initializedSteps.add(stepPath);
+              }
             }
           }
           
@@ -501,7 +506,7 @@
           currentBaseModelFile = autoLoadModel;
           // 自动加载指定模型
           const modelPath = `models/${category}/${autoLoadModel}`;
-          loadModelByUrl(modelPath);
+          loadModelByUrl(modelPath, false, modelPath, true); // 标记为初始加载
           return;
         }
       }
@@ -936,7 +941,7 @@
               currentBaseModelFile = modelSel.value;
               
               const modelPath = `models/${categorySel.value}/${modelSel.value}`;
-              loadModelByUrl(modelPath);
+              loadModelByUrl(modelPath, false, modelPath, true); // 标记为初始加载
               
               // 检测步骤文件
               detectStepFiles(categorySel.value, modelSel.value);
