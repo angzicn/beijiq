@@ -138,6 +138,27 @@
     .password-buttons button {
       flex: 1;
     }
+    /* 步骤说明样式 */
+    #step-description {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e0e0e0;
+      display: none; /* 默认隐藏 */
+    }
+    #description-content {
+      max-height: 150px;
+      overflow-y: auto;
+      font-size: 13px;
+      line-height: 1.4;
+      color: #333;
+      background: #f8f8f8;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+    }
+    #description-content p {
+      margin: 4px 0;
+    }
   </style>
 </head>
 <body>
@@ -178,6 +199,12 @@
       <div class="step-indicator">
         <span id="step-info">步骤: -/-</span>
       </div>
+    </div>
+    
+    <!-- 步骤说明 -->
+    <div id="step-description">
+      <div class="section-title">步骤说明</div>
+      <div id="description-content"></div>
     </div>
   </div>
 
@@ -298,6 +325,36 @@
       return center;
     }
 
+    // 加载并显示步骤说明文本
+    async function loadStepDescription(modelPath) {
+      const descriptionContainer = document.getElementById('step-description');
+      const contentElement = document.getElementById('description-content');
+      
+      // 构建文本文件路径（将.mpd替换为.txt）
+      const textFilePath = modelPath.replace('.mpd', '.txt');
+      
+      try {
+        // 尝试加载文本文件
+        const response = await fetch(textFilePath);
+        if (response.ok) {
+          const textContent = await response.text();
+          
+          // 显示文本内容，保留换行和格式
+          contentElement.innerHTML = textContent.replace(/\n/g, '<br>');
+          descriptionContainer.style.display = 'block';
+          
+          console.log('步骤说明加载成功:', textFilePath);
+        } else {
+          // 文本文件不存在，隐藏说明区域
+          descriptionContainer.style.display = 'none';
+        }
+      } catch (error) {
+        // 加载失败，隐藏说明区域
+        descriptionContainer.style.display = 'none';
+        console.log('未找到步骤说明文件:', textFilePath);
+      }
+    }
+
     function loadModelByUrl(url, isStepNavigation = false, stepPath = null) {
       const loadId = ++currentLoadId;
       
@@ -316,7 +373,6 @@
           scene.add(group);
           
           // 调整模型旋转以匹配LDView的视角
-          // 绕X轴旋转180度，使模型正面朝向相机
           group.rotation.x = Math.PI;
           
           // 材质更新确保颜色正确显示
@@ -348,6 +404,9 @@
           }
           
           setStatus("加载完成");
+          
+          // 加载步骤说明文本
+          loadStepDescription(url);
         }, 
         undefined, 
         err => {
