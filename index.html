@@ -182,7 +182,6 @@
     <div class="button-group">
       <button id="fitBtn">视野自适应</button>
       <button id="fullscreenBtn">全屏</button>
-      <button id="resetViewBtn">重置视角</button>
     </div>
     
     <div id="status">
@@ -401,6 +400,7 @@
           currentModelCenter = computeModelCenter(group);
           
           // 关键修复：无论是否步骤导航，都重置控制器的目标到模型中心
+          // 这确保了每个模型的旋转中心都是自己的几何中心
           controls.target.copy(currentModelCenter);
           controls.update();
           
@@ -411,6 +411,10 @@
               // 如果没有保存的状态，使用适应视角并保存
               fitCameraToObject(group);
               saveCameraState(stepPath);
+            } else {
+              // 即使恢复了相机状态，也要确保目标点正确设置为当前模型中心
+              controls.target.copy(currentModelCenter);
+              controls.update();
             }
           } else {
             // 不是步骤导航，使用适应视角
@@ -459,18 +463,6 @@
       // 确保控制器目标设置为模型中心
       controls.target.copy(center);
       controls.update();
-    }
-
-    // 重置视角函数
-    function resetView() {
-      if (currentGroup) {
-        fitCameraToObject(currentGroup);
-        // 如果是步骤导航中的模型，保存新的自适应视角
-        if (currentStepIndex >= 0) {
-          const currentStepFile = stepFiles[currentStepIndex];
-          saveCameraState(currentStepFile.path);
-        }
-      }
     }
 
     // 更新模型下拉菜单
@@ -833,9 +825,6 @@
         }
       }
     });
-
-    // 重置视角按钮
-    document.getElementById("resetViewBtn").addEventListener("click", resetView);
 
     // 修复全屏按钮
     document.getElementById("fullscreenBtn").addEventListener("click", async ()=>{
