@@ -258,6 +258,10 @@
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0,0,0);
+    
+    // 修复1: 禁止模型平移，只能旋转和缩放
+    controls.enablePan = false;
+    
     controls.update();
 
     // 光线 - 增强光照效果
@@ -286,6 +290,9 @@
     let currentModelCenter = new THREE.Vector3(); // 当前模型的中心点
     let verifiedSteps = new Set(); // 存储已验证通过的步骤路径
     let totalSteps = 0; // 总步骤数（不包含_00文件）
+    
+    // 修复2: 添加初始相机状态存储
+    let initialCameraState = null;
     
     function clearCurrent() {
       if (!currentGroup) return;
@@ -410,6 +417,15 @@
             // 如果是基础模型，保存初始状态
             if (stepPath) {
               saveCameraState(stepPath);
+            }
+            
+            // 修复2: 保存初始相机状态
+            if (!initialCameraState) {
+              initialCameraState = {
+                position: camera.position.clone(),
+                target: controls.target.clone(),
+                zoom: camera.zoom
+              };
             }
           }
           
@@ -847,6 +863,8 @@
       stepCameraStates = {};
       // 清空已验证步骤
       verifiedSteps.clear();
+      // 重置初始相机状态
+      initialCameraState = null;
     });
 
     // 获取URL参数
