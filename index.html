@@ -181,6 +181,16 @@
     #changelog-content p {
       margin: 4px 0;
     }
+    /* 程序下载按钮样式 */
+    #program-download {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e0e0e0;
+      display: none; /* 默认隐藏 */
+    }
+    #download-btn {
+      width: 100%;
+    }
   </style>
 </head>
 <body>
@@ -227,6 +237,11 @@
     <div id="step-description">
       <div class="section-title">步骤说明</div>
       <div id="description-content"></div>
+    </div>
+    
+    <!-- 程序下载 -->
+    <div id="program-download">
+      <button id="download-btn">点击下载程序</button>
     </div>
     
     <!-- 更新日志 -->
@@ -319,6 +334,7 @@
     let verifiedSteps = new Set(); // 存储已验证通过的步骤路径
     let totalSteps = 0; // 总步骤数（不包含_00文件）
     let isDefaultModelLoaded = false; // 标记是否已加载默认模型
+    let currentModelPath = ''; // 存储当前模型路径
     
     // 修复2: 添加标记，记录哪些步骤已经初始化过视角
     let initializedSteps = new Set();
@@ -377,6 +393,12 @@
       return /_\d+\.mpd$/.test(fileName);
     }
 
+    // 检查是否是_00模型
+    function isModel00(filePath) {
+      const fileName = filePath.split('/').pop();
+      return /_00\.mpd$/.test(fileName);
+    }
+
     // 加载并显示步骤说明文本
     async function loadStepDescription(modelPath) {
       const descriptionContainer = document.getElementById('step-description');
@@ -404,6 +426,61 @@
         // 加载失败，隐藏说明区域
         descriptionContainer.style.display = 'none';
         console.log('未找到步骤说明文件:', textFilePath);
+      }
+    }
+
+    // 检查并显示程序下载按钮
+    async function checkAndShowDownloadButton(modelPath) {
+      const downloadContainer = document.getElementById('program-download');
+      
+      // 检查是否是_00模型
+      if (isModel00(modelPath)) {
+        // 构建llsp3文件路径（将.mpd替换为.llsp3）
+        const programFilePath = modelPath.replace('.mpd', '.llsp3');
+        
+        try {
+          // 检查程序文件是否存在
+          const response = await fetch(programFilePath, { method: 'HEAD' });
+          if (response.ok) {
+            // 文件存在，显示下载按钮
+            downloadContainer.style.display = 'block';
+            
+            // 设置下载按钮点击事件
+            const downloadBtn = document.getElementById('download-btn');
+            downloadBtn.onclick = function() {
+              // 创建隐藏的下载链接并触发点击
+              const link = document.createElement('a');
+              link.href = programFilePath;
+              link.download = programFilePath.split('/').pop();
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              
+              setStatus("程序下载中...");
+              
+              // 3秒后恢复状态
+              setTimeout(() => {
+                if (currentGroup) {
+                  setStatus("加载完成");
+                } else {
+                  setStatus("就绪");
+                }
+              }, 3000);
+            };
+            
+            console.log('程序文件存在，显示下载按钮:', programFilePath);
+          } else {
+            // 文件不存在，隐藏下载按钮
+            downloadContainer.style.display = 'none';
+          }
+        } catch (error) {
+          // 检查失败，隐藏下载按钮
+          downloadContainer.style.display = 'none';
+          console.log('未找到程序文件:', programFilePath);
+        }
+      } else {
+        // 不是_00模型，隐藏下载按钮
+        downloadContainer.style.display = 'none';
       }
     }
 
@@ -445,6 +522,9 @@
       
       setStatus("加载中...");
       clearCurrent();
+      
+      // 保存当前模型路径
+      currentModelPath = url;
       
       // 如果不是默认模型，隐藏更新日志
       if (!isDefaultModel) {
@@ -546,6 +626,9 @@
           if (!isDefaultModel) {
             loadStepDescription(url);
           }
+          
+          // 检查并显示程序下载按钮
+          checkAndShowDownloadButton(url);
         }, 
         undefined, 
         err => {
