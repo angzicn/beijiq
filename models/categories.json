@@ -13,6 +13,7 @@
   "SPIKE PYTHON": [
     {"file": "fan.mpd", "name": "04_PutOutFire"},
     {"file": "05cupstacking.mpd", "name": "05_CupStacking"},
-    {"file": "06bowling.mpd", "name": "06_Bowling"}
+    {"file": "06bowling.mpd", "name": "06_Bowling"},
+    {"file": "09clawcrane.mpd", "name": "09_ClawCrane"}
   ]
 }
