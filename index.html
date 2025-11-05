@@ -190,6 +190,94 @@
     #download-btn {
       width: 100%;
     }
+    /* 代码显示窗口样式 */
+    #code-window {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      z-index: 20;
+      background: rgba(255,255,255,0.95);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      width: 500px;
+      max-width: 80vw;
+      display: none;
+    }
+    #code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 15px;
+      border-bottom: 1px solid #e0e0e0;
+      cursor: pointer;
+      background: #f5f5f5;
+      border-radius: 8px 8px 0 0;
+    }
+    #code-title {
+      font-weight: bold;
+      color: #333;
+    }
+    #code-toggle {
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      color: #666;
+    }
+    #code-content {
+      max-height: 400px;
+      overflow: auto;
+      display: block;
+    }
+    #code-container {
+      padding: 15px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      background: #f8f8f8;
+    }
+    .code-line {
+      display: flex;
+      margin-bottom: 2px;
+    }
+    .line-number {
+      width: 40px;
+      text-align: right;
+      padding-right: 10px;
+      color: #666;
+      user-select: none;
+      border-right: 1px solid #e0e0e0;
+      margin-right: 10px;
+    }
+    .line-code {
+      flex: 1;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    #code-actions {
+      padding: 10px 15px;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: flex-end;
+      background: #f5f5f5;
+      border-radius: 0 0 8px 8px;
+    }
+    #copy-code-btn {
+      padding: 6px 12px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    #copy-code-btn:hover {
+      background: #0056b3;
+    }
+    #code-window.collapsed #code-content,
+    #code-window.collapsed #code-actions {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -247,6 +335,20 @@
     <div id="changelog">
       <div class="section-title">更新日志</div>
       <div id="changelog-content"></div>
+    </div>
+  </div>
+
+  <!-- 代码显示窗口 -->
+  <div id="code-window">
+    <div id="code-header">
+      <span id="code-title">Python 代码</span>
+      <button id="code-toggle">−</button>
+    </div>
+    <div id="code-content">
+      <div id="code-container"></div>
+    </div>
+    <div id="code-actions">
+      <button id="copy-code-btn">复制代码</button>
     </div>
   </div>
 
@@ -493,6 +595,101 @@
       }
     }
 
+    // 检查并显示Python代码
+    async function checkAndShowPythonCode(modelPath) {
+      const codeWindow = document.getElementById('code-window');
+      console.log('检查Python代码，模型路径:', modelPath);
+      
+      // 检查是否是_00模型
+      if (isModel00(modelPath)) {
+        // 构建Python文件路径（将_00.mpd替换为.py）
+        const pythonFilePath = modelPath.replace('_00.mpd', '.py');
+        console.log('构建的Python文件路径:', pythonFilePath);
+        
+        try {
+          // 检查Python文件是否存在
+          const response = await fetch(pythonFilePath);
+          if (response.ok) {
+            const codeContent = await response.text();
+            // 文件存在，显示代码窗口
+            codeWindow.style.display = 'block';
+            console.log('Python文件存在，显示代码窗口');
+            
+            // 显示代码内容
+            displayPythonCode(codeContent, pythonFilePath.split('/').pop());
+          } else {
+            // 文件不存在，隐藏代码窗口
+            codeWindow.style.display = 'none';
+            console.log('Python文件不存在，状态码:', response.status);
+          }
+        } catch (error) {
+          // 检查失败，隐藏代码窗口
+          codeWindow.style.display = 'none';
+          console.log('检查Python文件失败:', error);
+        }
+      } else {
+        // 不是_00模型，隐藏代码窗口
+        codeWindow.style.display = 'none';
+        console.log('不是_00模型，隐藏代码窗口');
+      }
+    }
+
+    // 显示Python代码
+    function displayPythonCode(codeContent, fileName) {
+      const codeContainer = document.getElementById('code-container');
+      const codeTitle = document.getElementById('code-title');
+      
+      // 设置标题
+      codeTitle.textContent = fileName;
+      
+      // 清空容器
+      codeContainer.innerHTML = '';
+      
+      // 按行分割代码
+      const lines = codeContent.split('\n');
+      
+      // 为每行代码创建带行号的显示
+      lines.forEach((line, index) => {
+        const lineElement = document.createElement('div');
+        lineElement.className = 'code-line';
+        
+        const lineNumber = document.createElement('div');
+        lineNumber.className = 'line-number';
+        lineNumber.textContent = (index + 1).toString();
+        
+        const lineCode = document.createElement('div');
+        lineCode.className = 'line-code';
+        // 处理特殊字符
+        lineCode.textContent = line.replace(/\t/g, '    ').replace(/ /g, ' ');
+        
+        lineElement.appendChild(lineNumber);
+        lineElement.appendChild(lineCode);
+        codeContainer.appendChild(lineElement);
+      });
+      
+      // 设置复制按钮事件
+      const copyBtn = document.getElementById('copy-code-btn');
+      // 移除之前的事件监听器
+      const newCopyBtn = copyBtn.cloneNode(true);
+      copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
+      
+      newCopyBtn.addEventListener('click', function() {
+        navigator.clipboard.writeText(codeContent).then(() => {
+          const originalText = newCopyBtn.textContent;
+          newCopyBtn.textContent = '已复制!';
+          setTimeout(() => {
+            newCopyBtn.textContent = originalText;
+          }, 2000);
+        }).catch(err => {
+          console.error('复制失败:', err);
+          newCopyBtn.textContent = '复制失败';
+          setTimeout(() => {
+            newCopyBtn.textContent = '复制代码';
+          }, 2000);
+        });
+      });
+    }
+
     // 加载并显示更新日志
     async function loadChangelog() {
       const changelogContainer = document.getElementById('changelog');
@@ -638,6 +835,9 @@
           
           // 检查并显示程序下载按钮
           checkAndShowDownloadButton(url);
+          
+          // 检查并显示Python代码
+          checkAndShowPythonCode(url);
         }, 
         undefined, 
         err => {
@@ -1004,6 +1204,20 @@
       renderer.setSize(innerWidth, innerHeight);
     });
 
+    // 代码窗口折叠/展开功能
+    document.getElementById("code-toggle").addEventListener("click", function() {
+      const codeWindow = document.getElementById("code-window");
+      const toggleBtn = document.getElementById("code-toggle");
+      
+      if (codeWindow.classList.contains("collapsed")) {
+        codeWindow.classList.remove("collapsed");
+        toggleBtn.textContent = "−";
+      } else {
+        codeWindow.classList.add("collapsed");
+        toggleBtn.textContent = "+";
+      }
+    });
+
     document.getElementById("loadBtn").addEventListener("click", ()=>{
       const categorySel = document.getElementById("categorySelect");
       const modelSel = document.getElementById("modelSelect");
@@ -1148,3 +1362,4 @@
   </script>
 </body>
 </html>
+
