@@ -506,6 +506,11 @@
       return is00Model;
     }
 
+    // 构建CDN路径
+    function buildCdnPath(relativePath) {
+      return `${CDN_BASE}/${relativePath}`;
+    }
+
     // 加载并显示步骤说明文本
     async function loadStepDescription(modelPath) {
       const descriptionContainer = document.getElementById('step-description');
@@ -700,7 +705,7 @@
       
       try {
         // 尝试加载日志文件
-        const response = await fetch(`${CDN_BASE}/log.txt`);
+        const response = await fetch(buildCdnPath('log.txt'));
         if (response.ok) {
           const textContent = await response.text();
           
@@ -724,11 +729,6 @@
     function hideChangelog() {
       const changelogContainer = document.getElementById('changelog');
       changelogContainer.style.display = 'none';
-    }
-
-    // 构建CDN路径
-    function buildCdnPath(relativePath) {
-      return `${CDN_BASE}/${relativePath}`;
     }
 
     function loadModelByUrl(url, isStepNavigation = false, stepPath = null, isDefaultModel = false) {
