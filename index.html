@@ -305,7 +305,7 @@
     
     <div id="status">
       <span id="status-text">状态：就绪 (正交视图)</span>
-      <img id="logo" src="https://cdn.jsdelivr.net/gh/angzicn/beijiq@main/beijiq.svg" alt="Logo">
+      <img id="logo" src="beijiq.svg" alt="Logo">
     </div>
     
     <!-- 步骤导航 -->
@@ -439,9 +439,6 @@
     
     // 修复2: 添加标记，记录哪些步骤已经初始化过视角
     let initializedSteps = new Set();
-
-    // CDN 基础路径配置
-    const CDN_BASE = 'https://cdn.jsdelivr.net/gh/angzicn/beijiq@main';
     
     function clearCurrent() {
       if (!currentGroup) return;
@@ -504,11 +501,6 @@
       const is00Model = /_00\.mpd$/.test(fileName);
       console.log('是_00模型吗:', is00Model);
       return is00Model;
-    }
-
-    // 构建CDN路径
-    function buildCdnPath(relativePath) {
-      return `${CDN_BASE}/${relativePath}`;
     }
 
     // 加载并显示步骤说明文本
@@ -705,7 +697,7 @@
       
       try {
         // 尝试加载日志文件
-        const response = await fetch(buildCdnPath('log.txt'));
+        const response = await fetch('log.txt');
         if (response.ok) {
           const textContent = await response.text();
           
@@ -914,7 +906,7 @@
           // 设置当前基础模型文件
           currentBaseModelFile = autoLoadModel;
           // 自动加载指定模型
-          const modelPath = buildCdnPath(`models/${category}/${autoLoadModel}`);
+          const modelPath = `models/${category}/${autoLoadModel}`;
           loadModelByUrl(modelPath);
           return;
         }
@@ -950,7 +942,7 @@
       
       // 检查每个步骤文件是否存在
       for (let i = 0; i < stepPatterns.length; i++) {
-        const filePath = buildCdnPath(`models/${category}/${stepPatterns[i]}`);
+        const filePath = `models/${category}/${stepPatterns[i]}`;
         try {
           const response = await fetch(filePath, { method: 'HEAD' });
           if (response.ok) {
@@ -1239,7 +1231,7 @@
       currentBaseModelFile = modelSel.value;
       
       // 构建模型路径
-      const modelPath = buildCdnPath(`models/${categorySel.value}/${modelSel.value}`);
+      const modelPath = `models/${categorySel.value}/${modelSel.value}`;
       loadModelByUrl(modelPath);
       
       // 检测步骤文件
@@ -1323,7 +1315,7 @@
       
       try {
         // 加载分类配置文件
-        const res = await fetch(buildCdnPath("models/categories.json"), {cache: "no-store"});
+        const res = await fetch("models/categories.json", {cache: "no-store"});
         categoriesData = await res.json();
         
         categorySel.innerHTML = "<option value=''>-- 请选择分类 --</option>";
@@ -1351,7 +1343,7 @@
           // 不自动选择第一个分类，保持默认提示
           // 加载默认模型
           setTimeout(() => {
-            loadModelByUrl(buildCdnPath('beijiq.mpd'), false, null, true);
+            loadModelByUrl('beijiq.mpd', false, null, true);
             // 加载更新日志
             loadChangelog();
           }, 100);
