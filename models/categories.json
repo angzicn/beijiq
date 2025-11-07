@@ -8,7 +8,8 @@
     {"file": "06claw.mpd", "name": "06_Distance"},
     {"file": "07sort.mpd", "name": "07_Sort"},
     {"file": "08glof.mpd", "name": "08_Golf"},
-    {"file": "09probability.mpd", "name": "09_Probability"}
+    {"file": "09probability.mpd", "name": "09_Probability"},
+    {"file": "10hammer.mpd", "name": "10_Hammer"}
   ],
   "SPIKE PYTHON": [
     {"file": "fan.mpd", "name": "04_PutOutFire"},
