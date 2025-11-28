@@ -36,6 +36,12 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      white-space: nowrap; /* 防止文字换行 */
+    }
+    .section-title-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     #ui-toggle {
       background: none;
@@ -49,6 +55,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      margin-left: 8px; /* 添加左边距，与文字分开 */
+      flex-shrink: 0; /* 防止按钮被压缩 */
     }
     #ui-content {
       display: block;
@@ -305,7 +313,7 @@
 <body>
   <div id="ui">
     <div class="section-title">
-      <span>选择模型</span>
+      <span class="section-title-text">选择模型</span>
       <button id="ui-toggle">−</button>
     </div>
     
