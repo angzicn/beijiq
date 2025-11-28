@@ -24,10 +24,37 @@
       top: 10px;
       z-index: 20;
       background: rgba(255,255,255,0.95);
-      padding: 10px;
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.12);
       min-width: 260px;
+    }
+    #ui-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 15px;
+      border-bottom: 1px solid #e0e0e0;
+      cursor: pointer;
+      background: #f5f5f5;
+      border-radius: 8px 8px 0 0;
+    }
+    #ui-title {
+      font-weight: bold;
+      color: #333;
+    }
+    #ui-toggle {
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      color: #666;
+    }
+    #ui-content {
+      padding: 10px;
+      display: block;
+    }
+    #ui.collapsed #ui-content {
+      display: none;
     }
     #ui select, #ui button { margin:6px 0; width:100%; box-sizing:border-box; }
     #status { 
@@ -282,59 +309,65 @@
 </head>
 <body>
   <div id="ui">
-    <div class="section-title">选择模型</div>
-    
-    <div class="select-group">
-      <select id="categorySelect">
-        <option>正在加载分类…</option>
-      </select>
-      <select id="modelSelect">
-        <option>--请选择模型--</option>
-      </select>
+    <div id="ui-header">
+      <span id="ui-title">控制面板</span>
+      <button id="ui-toggle">−</button>
     </div>
-    
-    <div class="load-copy-group">
-      <button id="loadBtn">加载模型</button>
-      <button id="copyLinkBtn">复制链接</button>
-    </div>
-    
-    <div class="button-group">
-      <button id="fitBtn">视野自适应</button>
-      <button id="fullscreenBtn">全屏</button>
-    </div>
-    
-    <div id="status">
-      <span id="status-text">状态：就绪 (正交视图)</span>
-      <img id="logo" src="beijiq.svg" alt="Logo">
-    </div>
-    
-    <!-- 步骤导航 -->
-    <div id="step-navigation">
-      <div class="step-title">步骤导航</div>
-      <div class="step-controls">
-        <button id="prevStepBtn">上一页</button>
-        <button id="nextStepBtn">下一页</button>
+    <div id="ui-content">
+      <div class="section-title">选择模型</div>
+      
+      <div class="select-group">
+        <select id="categorySelect">
+          <option>正在加载分类…</option>
+        </select>
+        <select id="modelSelect">
+          <option>--请选择模型--</option>
+        </select>
       </div>
-      <div class="step-indicator">
-        <span id="step-info">步骤: -/-</span>
+      
+      <div class="load-copy-group">
+        <button id="loadBtn">加载模型</button>
+        <button id="copyLinkBtn">复制链接</button>
       </div>
-    </div>
-    
-    <!-- 步骤说明 -->
-    <div id="step-description">
-      <div class="section-title">步骤说明</div>
-      <div id="description-content"></div>
-    </div>
-    
-    <!-- 程序下载 -->
-    <div id="program-download">
-      <button id="download-btn">点击下载程序</button>
-    </div>
-    
-    <!-- 更新日志 -->
-    <div id="changelog">
-      <div class="section-title">更新日志</div>
-      <div id="changelog-content"></div>
+      
+      <div class="button-group">
+        <button id="fitBtn">视野自适应</button>
+        <button id="fullscreenBtn">全屏</button>
+      </div>
+      
+      <div id="status">
+        <span id="status-text">状态：就绪 (正交视图)</span>
+        <img id="logo" src="beijiq.svg" alt="Logo">
+      </div>
+      
+      <!-- 步骤导航 -->
+      <div id="step-navigation">
+        <div class="step-title">步骤导航</div>
+        <div class="step-controls">
+          <button id="prevStepBtn">上一页</button>
+          <button id="nextStepBtn">下一页</button>
+        </div>
+        <div class="step-indicator">
+          <span id="step-info">步骤: -/-</span>
+        </div>
+      </div>
+      
+      <!-- 步骤说明 -->
+      <div id="step-description">
+        <div class="section-title">步骤说明</div>
+        <div id="description-content"></div>
+      </div>
+      
+      <!-- 程序下载 -->
+      <div id="program-download">
+        <button id="download-btn">点击下载程序</button>
+      </div>
+      
+      <!-- 更新日志 -->
+      <div id="changelog">
+        <div class="section-title">更新日志</div>
+        <div id="changelog-content"></div>
+      </div>
     </div>
   </div>
 
@@ -1202,6 +1235,20 @@
       camera.bottom = -frustumSize / 2;
       camera.updateProjectionMatrix();
       renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // UI窗口折叠/展开功能
+    document.getElementById("ui-toggle").addEventListener("click", function() {
+      const uiWindow = document.getElementById("ui");
+      const toggleBtn = document.getElementById("ui-toggle");
+      
+      if (uiWindow.classList.contains("collapsed")) {
+        uiWindow.classList.remove("collapsed");
+        toggleBtn.textContent = "−";
+      } else {
+        uiWindow.classList.add("collapsed");
+        toggleBtn.textContent = "+";
+      }
     });
 
     // 代码窗口折叠/展开功能
