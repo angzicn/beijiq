@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -27,17 +28,19 @@
       padding: 10px;
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-      min-width: 280px; /* 增加最小宽度确保文字可见 */
+      min-width: 260px;
     }
     .section-title { 
       font-weight: bold; 
       margin-bottom: 8px;
       color: #333;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      position: relative;
+      padding-right: 25px; /* 为折叠按钮留出空间 */
     }
     #ui-toggle {
+      position: absolute;
+      right: 0;
+      top: 0;
       background: none;
       border: none;
       font-size: 16px;
@@ -49,8 +52,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-left: 8px;
-      flex-shrink: 0;
     }
     #ui-content {
       display: block;
@@ -307,7 +308,7 @@
 <body>
   <div id="ui">
     <div class="section-title">
-      <span>选择模型</span>
+      选择模型
       <button id="ui-toggle">−</button>
     </div>
     
