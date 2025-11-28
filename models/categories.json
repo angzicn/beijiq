@@ -10,7 +10,8 @@
     {"file": "08glof.mpd", "name": "08_Golf"},
     {"file": "09probability.mpd", "name": "09_Probability"},
     {"file": "10hammer.mpd", "name": "10_Hammer"},
-    {"file": "12launch.mpd", "name": "12_Launch"}
+    {"file": "12launch.mpd", "name": "12_Launch"},
+    {"file": "13speed.mpd", "name": "13_Speed"}
   ],
   "SPIKE PYTHON": [
     {"file": "fan.mpd", "name": "04_PutOutFire"},
