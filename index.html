@@ -33,25 +33,15 @@
       font-weight: bold; 
       margin-bottom: 8px;
       color: #333;
-      position: relative;
-      padding-right: 25px; /* 为折叠按钮留出空间 */
-    }
-    #ui-toggle {
-      position: absolute;
-      right: 5px; /* 距离右侧5px */
-      top: 50%; /* 垂直居中 */
-      transform: translateY(-50%); /* 垂直居中调整 */
-      background: none;
-      border: none;
-      font-size: 16px;
-      cursor: pointer;
-      color: #666;
-      padding: 0;
-      width: 20px;
-      height: 20px;
+      cursor: pointer; /* 添加指针样式表示可点击 */
+      user-select: none; /* 防止文字被选中 */
+      transition: color 0.2s; /* 添加颜色过渡效果 */
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      justify-content: center;
+    }
+    .section-title:hover {
+      color: #007bff; /* 鼠标悬停时改变颜色 */
     }
     #ui-content {
       display: block;
@@ -307,9 +297,8 @@
 </head>
 <body>
   <div id="ui">
-    <div class="section-title">
+    <div class="section-title" id="ui-title-toggle">
       选择模型
-      <button id="ui-toggle">−</button>
     </div>
     
     <div id="ui-content">
@@ -1234,17 +1223,17 @@
       renderer.setSize(innerWidth, innerHeight);
     });
 
-    // UI窗口折叠/展开功能
-    document.getElementById("ui-toggle").addEventListener("click", function() {
+    // UI窗口折叠/展开功能 - 现在点击"选择模型"标题即可
+    document.getElementById("ui-title-toggle").addEventListener("click", function() {
       const uiWindow = document.getElementById("ui");
-      const toggleBtn = document.getElementById("ui-toggle");
+      const titleToggle = document.getElementById("ui-title-toggle");
       
       if (uiWindow.classList.contains("collapsed")) {
         uiWindow.classList.remove("collapsed");
-        toggleBtn.textContent = "−";
+        titleToggle.textContent = "选择模型";
       } else {
         uiWindow.classList.add("collapsed");
-        toggleBtn.textContent = "+";
+        titleToggle.textContent = "选择模型";
       }
     });
 
@@ -1406,4 +1395,3 @@
   </script>
 </body>
 </html>
-
